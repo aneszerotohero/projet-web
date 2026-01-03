@@ -10,6 +10,69 @@ class AbsenceController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        
+        // TEMP: Return mock data for frontend development if no user is logged in
+        if (!$user) {
+            $mockData = [
+                'student' => [
+                    'nom' => 'Benzineb',
+                    'prenom' => 'Karim',
+                    'academic_year' => '2023-2024',
+                    'term' => 'Term 1'
+                ],
+                'stats' => [
+                    'total_hours' => 14,
+                    'since_last_month' => 2,
+                    'justified_hours' => 10,
+                    'unjustified_hours' => 4,
+                    'deleted_records' => 2
+                ],
+                'trends' => [
+                    // Mock trend data for last 6 months
+                    'months' => ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
+                    'data' => [2, 0, 4, 3, 2, 3] 
+                ],
+                'absences' => [
+                    [
+                        'id' => 1,
+                        'date' => 'Feb 12, 2024',
+                        'module' => 'Mathematics',
+                        'time' => '08:00 - 10:00',
+                        'type' => 'Unjustified',
+                        'status' => 'Active Record',
+                        'details' => '-',
+                        'is_deleted' => false
+                    ],
+                    [
+                        'id' => 2,
+                        'date' => 'Feb 10, 2024',
+                        'module' => 'Physics',
+                        'time' => '14:00 - 16:00',
+                        'type' => 'N/A',
+                        'status' => 'Deleted',
+                        'details' => 'Teacher error - student was present during lab session.',
+                        'is_deleted' => true
+                    ],
+                    [
+                        'id' => 3,
+                        'date' => 'Jan 28, 2024',
+                        'module' => 'French',
+                        'time' => '10:00 - 11:00',
+                        'type' => 'Justified',
+                        'status' => 'Active Record',
+                        'details' => 'Medical Certificate.pdf',
+                        'is_deleted' => false
+                    ],
+                    // Add more if needed...
+                ]
+            ];
+            
+            if (class_exists(\Inertia\Inertia::class)) {
+                return \Inertia\Inertia::render('Eleve/Absences', $mockData);
+            }
+            return response()->json($mockData);
+        }
+        
         $studentId = $user->student_id ?? ($user->student->id ?? null);
         if (! $studentId) {
             abort(404, 'Student not found.');

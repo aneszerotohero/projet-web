@@ -11,14 +11,14 @@ Route::get('/login', [\App\Http\Controllers\AuthController::class, 'showLogin'])
 Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
 Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout'])->name('logout');
 
-// Student dashboard (needs auth + auth.eleve middleware)
+// Student dashboard
 Route::middleware(['auth','auth.eleve','current.semester'])->group(function () {
     Route::get('/eleve/dashboard', [\App\Http\Controllers\StudentDashboardController::class, 'index'])->name('eleve.dashboard');
     Route::get('/eleve/absences', [\App\Http\Controllers\AbsenceController::class, 'index'])->name('eleve.absences');
     Route::get('/eleve/notes', [\App\Http\Controllers\Eleve\NotesController::class, 'index'])->name('eleve.notes');
 });
 
-// Admin dashboard (needs auth + auth.admin middleware)
+// Admin dashboard
 Route::middleware(['auth','auth.admin'])->group(function () {
     Route::get('/admin/dashboard', [\App\Http\Controllers\AdminDashboardController::class, 'index'])->name('admin.dashboard');
     // Admin SPA pages

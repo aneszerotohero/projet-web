@@ -1,146 +1,197 @@
-import React, { useEffect, useState } from 'react';
-import AppLayout from '../../Layouts/AppLayout';
-import axios from 'axios';
-import Modal from '../../Components/Modal';
-import Table from '../../Components/Table';
+import React, { useState } from 'react';
+import AdminLayout from '../../Layouts/AdminLayout';
+import {
+    Download, Plus, Search, Filter, Calendar, FileText,
+    MoreHorizontal, ChevronLeft, ChevronRight, TrendingUp, AlertTriangle, CheckCircle
+} from 'lucide-react';
 
 export default function NotesAdmin() {
-    const [notesPage, setNotesPage] = useState(null);
-    const [meta, setMeta] = useState({ students: [], modules: [], coefs: [] });
-    const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [perPage] = useState(15);
+    // Mock Data based on the mockup
+    const stats = {
+        average_gpa: { value: '12.4', trend: '+0.2%', trend_type: 'up' },
+        failing_students: { value: '45', trend: '-5% vs last term', trend_type: 'down_good' },
+        grades_today: { value: '128', trend: '+12%', trend_type: 'up' }
+    };
 
-    const [modalOpen, setModalOpen] = useState(false);
-    const [form, setForm] = useState({ id: null, student_id: '', module_id: '', coef_id: '', note: '' });
-    const [errors, setErrors] = useState({});
-
-    useEffect(() => {
-        fetchMeta();
-        fetchNotes();
-    }, [page]);
-
-    function fetchMeta() {
-        axios.get('/admin/notes/meta').then(r => setMeta(r.data));
-    }
-
-    function fetchNotes() {
-        setLoading(true);
-        axios.get('/admin/notes', { params: { page, per_page: perPage } }).then(r => {
-            setNotesPage(r.data);
-            setLoading(false);
-        });
-    }
-
-    function openCreate() {
-        setForm({ id: null, student_id: '', module_id: '', coef_id: '', note: '' });
-        setErrors({});
-        setModalOpen(true);
-    }
-
-    function openEdit(row) {
-        setForm({ id: row.id, student_id: row.student_id, module_id: row.module_id, coef_id: row.coef_id, note: row.note });
-        setErrors({});
-        setModalOpen(true);
-    }
-
-    function save() {
-        // client validation
-        const e = {};
-        if (!form.student_id) e.student_id = 'Requis';
-        if (!form.module_id) e.module_id = 'Requis';
-        if (!form.coef_id) e.coef_id = 'Requis';
-        if (form.note === '' || form.note === null) e.note = 'Requis';
-        setErrors(e);
-        if (Object.keys(e).length) return;
-
-        axios.post('/admin/notes/single', form).then(() => {
-            setModalOpen(false); fetchNotes();
-        }).catch(err => {
-            if (err.response && err.response.data && err.response.data.errors) {
-                setErrors(err.response.data.errors);
-            }
-        });
-    }
-
-    function remove(id) {
-        axios.delete('/admin/notes/' + id).then(() => fetchNotes());
-    }
-
-    const columns = [
-        { key: 'student', title: 'Élève', render: r => `${r.student.nom} ${r.student.prenom} (${r.student_id})` },
-        { key: 'module', title: 'Module', render: r => r.module.libelle },
-        { key: 'coef', title: 'Type', render: r => r.coef.libelle },
-        { key: 'note', title: 'Note' },
-        { key: 'actions', title: 'Actions', render: r => (
-            <div>
-                <button onClick={() => openEdit(r)} className="mr-2 text-blue-600">Éditer</button>
-                <button onClick={() => remove(r.id)} className="text-red-600">Supprimer</button>
-            </div>
-        ) }
+    const mockNotes = [
+        { id: 1, student: { name: 'Amine Benali', id: '2023001', avatar: null }, module: 'Mathematics', type: 'Exam', grade: 14.5, coeff: 5, date: 'Oct 24, 2023' },
+        { id: 2, student: { name: 'Sarah Khadir', id: '2023045', avatar: 'https://i.pravatar.cc/150?u=sarah' }, module: 'Physics', type: 'Test', grade: 8.0, coeff: 4, date: 'Oct 23, 2023' },
+        { id: 3, student: { name: 'Mohamed Zaid', id: '2023012', avatar: 'https://i.pravatar.cc/150?u=mohamed' }, module: 'Natural Sciences', type: 'Homework', grade: 18.5, coeff: 2, date: 'Oct 22, 2023' },
+        { id: 4, student: { name: 'Lina Hamidi', id: '2023089', avatar: 'https://i.pravatar.cc/150?u=lina' }, module: 'Arabic Literature', type: 'Exam', grade: 12.0, coeff: 3, date: 'Oct 21, 2023' },
+        { id: 5, student: { name: 'Yacine Kadri', id: '2023055', avatar: 'https://i.pravatar.cc/150?u=yacine' }, module: 'Mathematics', type: 'Test', grade: 9.5, coeff: 5, date: 'Oct 20, 2023' },
     ];
 
+    const [filters, setFilters] = useState({ search: '', module: 'All Modules', semester: 'All Semesters', type: 'All Types' });
+
+    const KpiCard = ({ title, value, trend, trendType, icon: Icon, color }) => (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
+            <div className="flex justify-between items-start z-10">
+                <h3 className="text-gray-500 font-bold text-sm">{title}</h3>
+                <div className={`p-2 rounded-lg ${color === 'green' ? 'bg-green-50 text-green-600' : color === 'red' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <Icon className="w-5 h-5" />
+                </div>
+            </div>
+            <div className="z-10">
+                <div className="flex items-baseline gap-2">
+                    <h2 className="text-4xl font-black text-gray-900">{value}</h2>
+                    {title === 'Average GPA' && <span className="text-gray-400 font-bold text-lg">/20</span>}
+                </div>
+                <div className={`text-xs font-bold mt-2 ${trendType === 'up' || trendType === 'down_good' ? 'text-green-600' : 'text-red-500'}`}>
+                    {trend}
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <AppLayout>
-            <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl font-bold">Gestion des notes</h1>
-                    <button onClick={openCreate} className="bg-green-500 text-white px-3 py-1 rounded">Ajouter</button>
+        <AdminLayout>
+            <div className="p-8 max-w-7xl mx-auto bg-gray-50/50 min-h-screen font-sans">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Notes Management</h1>
+                        <p className="text-gray-500 mt-1 text-sm">Manage student grades, coefficients, and academic records.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-sm">
+                            <FileText className="w-4 h-4" />
+                            Import CSV
+                        </button>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm">
+                            <Plus className="w-4 h-4" />
+                            Add New Grade
+                        </button>
+                    </div>
                 </div>
 
-                <div className="bg-white p-4 rounded shadow">
-                    {loading ? <div>Chargement...</div> : (
-                        <>
-                            <Table columns={columns} data={notesPage.data || []} />
-                            <div className="mt-4 flex justify-between items-center">
-                                <div>Pages: {notesPage.current_page} / {notesPage.last_page}</div>
-                                <div>
-                                    <button disabled={!notesPage.prev_page_url} onClick={() => setPage(page - 1)} className="mr-2">Préc</button>
-                                    <button disabled={!notesPage.next_page_url} onClick={() => setPage(page + 1)}>Suiv</button>
-                                </div>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <KpiCard title="Average GPA" value={stats.average_gpa.value} trend={stats.average_gpa.trend} trendType={stats.average_gpa.trend_type} icon={TrendingUp} color="green" />
+                    <KpiCard title="Failing Students" value={stats.failing_students.value} trend={stats.failing_students.trend} trendType={stats.failing_students.trend_type} icon={AlertTriangle} color="red" />
+                    <KpiCard title="Grades Entered Today" value={stats.grades_today.value} trend={stats.grades_today.trend} trendType={stats.grades_today.trend_type} icon={Calendar} color="blue" />
+                </div>
+
+                {/* Filters */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="md:col-span-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Search Student</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Name or Student ID..."
+                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+                                />
                             </div>
-                        </>
-                    )}
-                </div>
-
-                <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? 'Éditer note' : 'Ajouter note'}>
-                    <div className="space-y-2">
+                        </div>
                         <div>
-                            <label>Élève</label>
-                            <select value={form.student_id} onChange={e => setForm({...form, student_id: e.target.value})} className="w-full p-2 border rounded">
-                                <option value="">-- choisir --</option>
-                                {meta.students.map(s => <option key={s.id} value={s.id}>{s.nom} {s.prenom} ({s.id})</option>)}
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Module</label>
+                            <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                                <option>All Modules</option>
+                                <option>Mathematics</option>
+                                <option>Physics</option>
                             </select>
-                            {errors.student_id && <div className="text-red-600">{errors.student_id}</div>}
                         </div>
                         <div>
-                            <label>Module</label>
-                            <select value={form.module_id} onChange={e => setForm({...form, module_id: e.target.value})} className="w-full p-2 border rounded">
-                                <option value="">-- choisir --</option>
-                                {meta.modules.map(m => <option key={m.id} value={m.id}>{m.libelle} (S{m.semestre})</option>)}
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Semester</label>
+                            <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                                <option>All Semesters</option>
+                                <option>Semester 1</option>
                             </select>
-                            {errors.module_id && <div className="text-red-600">{errors.module_id}</div>}
                         </div>
-                        <div>
-                            <label>Type</label>
-                            <select value={form.coef_id} onChange={e => setForm({...form, coef_id: e.target.value})} className="w-full p-2 border rounded">
-                                <option value="">-- choisir --</option>
-                                {meta.coefs.map(c => <option key={c.id} value={c.id}>{c.libelle} (x{c.coef})</option>)}
-                            </select>
-                            {errors.coef_id && <div className="text-red-600">{errors.coef_id}</div>}
-                        </div>
-                        <div>
-                            <label>Note</label>
-                            <input type="number" value={form.note} onChange={e => setForm({...form, note: e.target.value})} className="w-full p-2 border rounded" />
-                            {errors.note && <div className="text-red-600">{errors.note}</div>}
-                        </div>
-                        <div className="flex justify-end mt-4">
-                            <button className="mr-2" onClick={() => setModalOpen(false)}>Annuler</button>
-                            <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={save}>Enregistrer</button>
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Grade Type</label>
+                                <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                                    <option>All Types</option>
+                                    <option>Exam</option>
+                                    <option>Test</option>
+                                </select>
+                            </div>
+                            <button className="text-sm font-bold text-blue-600 hover:text-blue-800 mb-1 self-end">Clear Filters</button>
                         </div>
                     </div>
-                </Modal>
+                </div>
+
+                {/* Table */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50/50 text-gray-400 text-xs uppercase font-extrabold tracking-wider border-b border-gray-100">
+                                <tr>
+                                    <th className="px-6 py-4 w-10">
+                                        <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    </th>
+                                    <th className="px-6 py-4">Student</th>
+                                    <th className="px-6 py-4">Module</th>
+                                    <th className="px-6 py-4">Type</th>
+                                    <th className="px-6 py-4">Grade</th>
+                                    <th className="px-6 py-4">Coeff.</th>
+                                    <th className="px-6 py-4">Date</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {mockNotes.map((note) => (
+                                    <tr key={note.id} className="group hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-200">
+                                                    {note.student.avatar ? <img src={note.student.avatar} alt={note.student.name} className="w-full h-full object-cover" /> : note.student.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900">{note.student.name}</div>
+                                                    <div className="text-xs font-medium text-gray-400">ID: {note.student.id}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-gray-700">{note.module}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold 
+                                                ${note.type === 'Exam' ? 'bg-purple-100 text-purple-700' :
+                                                    note.type === 'Test' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                                {note.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-baseline gap-1">
+                                                <span className={`text-lg font-black ${note.grade < 10 ? 'text-red-500' : note.grade >= 16 ? 'text-green-600' : 'text-gray-900'}`}>
+                                                    {note.grade < 10 ? `0${note.grade}` : note.grade}
+                                                </span>
+                                                <span className="text-xs font-medium text-gray-400">/20</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-gray-900">{note.coeff}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-500">{note.date}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                <MoreHorizontal className="w-5 h-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {/* Pagination */}
+                    <div className="p-4 border-t border-gray-50 flex justify-between items-center text-sm">
+                        <span className="text-gray-500 font-medium">Showing <span className="font-bold text-gray-900">1</span> to <span className="font-bold text-gray-900">5</span> of <span className="font-bold text-gray-900">128</span> results</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400 mr-2 font-medium">Previous</span>
+                            <button className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/30">1</button>
+                            <button className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-50 rounded-lg">2</button>
+                            <button className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-50 rounded-lg">3</button>
+                            <span className="text-gray-400">...</span>
+                            <button className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-50 rounded-lg">10</button>
+                            <span className="text-gray-600 ml-2 font-bold cursor-pointer hover:text-blue-600">Next</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </AppLayout>
+        </AdminLayout>
     );
 }
