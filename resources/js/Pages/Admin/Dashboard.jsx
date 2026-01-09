@@ -7,6 +7,11 @@ import {
 } from 'lucide-react';
 
 export default function AdminDashboard({ podium = [], others = [], ranking_stats = {}, filters = {} }) {
+    // Ensure safe defaults
+    const safePodium = Array.isArray(podium) ? podium : [];
+    const safeOthers = Array.isArray(others) ? others : [];
+    const safeRankingStats = ranking_stats || {};
+    const safeFilters = filters || {};
 
     const KpiCard = ({ title, value, trend, type, icon: Icon }) => (
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 relative overflow-hidden group hover:shadow-md transition-shadow">
@@ -20,12 +25,18 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
             <div className="z-10">
                 <div className="flex items-baseline gap-3">
                     <h2 className="text-3xl font-black text-gray-900">{value}</h2>
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${(trend.includes('+') && type !== 'down_good') || (trend.includes('-') && type === 'down_good')
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                        {trend}
-                    </span>
+                   {trend && (
+                       <span
+                           className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                               (trend?.includes('+') && type !== 'down_good') || (trend?.includes('-') && type === 'down_good')
+                                   ? 'bg-green-100 text-green-800'
+                                   : 'bg-red-100 text-red-800'
+                           }`}
+                       >
+                           {trend}
+                       </span>
+                   )}
+
                 </div>
             </div>
             {/* Background decoration */}
@@ -33,37 +44,45 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
         </div>
     );
 
-    const PodiumStep = ({ student, rank, color }) => (
-        <div className={`flex flex-col items-center flex-1 ${rank === 1 ? '-mt-12 scale-110 z-10' : 'mt-0'}`}>
-            <div className="relative mb-4 group cursor-pointer">
-                <div className={`w-24 h-24 rounded-full border-4 ${rank === 1 ? 'border-yellow-400 shadow-xl shadow-yellow-200' :
-                        rank === 2 ? 'border-gray-300 shadow-lg' : 'border-orange-300 shadow-lg'
-                    } overflow-hidden bg-gray-100`}>
-                    {student.avatar ? (
-                        <img src={student.avatar} alt={student.nom} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 font-bold text-2xl">
-                            {student.prenom[0]}{student.nom[0]}
-                        </div>
-                    )}
+    const PodiumStep = ({ student, rank, color }) => {
+        if (!student) return null;
+        const prenom = student.prenom || '';
+        const nom = student.nom || '';
+        const moyenne = student.moyenne_cycle || 0;
+        const initials = (prenom[0] || '') + (nom[0] || '');
+        
+        return (
+            <div className={`flex flex-col items-center flex-1 ${rank === 1 ? '-mt-12 scale-110 z-10' : 'mt-0'}`}>
+                <div className="relative mb-4 group cursor-pointer">
+                    <div className={`w-24 h-24 rounded-full border-4 ${rank === 1 ? 'border-yellow-400 shadow-xl shadow-yellow-200' :
+                            rank === 2 ? 'border-gray-300 shadow-lg' : 'border-orange-300 shadow-lg'
+                        } overflow-hidden bg-gray-100`}>
+                        {student.avatar ? (
+                            <img src={student.avatar} alt={nom} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 font-bold text-2xl">
+                                {initials || '?'}
+                            </div>
+                        )}
+                    </div>
+                    <div className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full flex items-center justify-center font-black text-white text-sm shadow-md border-2 border-white ${color}`}>
+                        {rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'}
+                    </div>
                 </div>
-                <div className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full flex items-center justify-center font-black text-white text-sm shadow-md border-2 border-white ${color}`}>
-                    {rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'}
+                <div className="text-center mb-4">
+                    <h3 className="font-extrabold text-gray-900 text-lg leading-tight">{prenom} {nom}</h3>
+                    <div className="flex items-center justify-center gap-1 mt-1 text-blue-600 font-black text-xl">
+                        {Number(moyenne).toFixed(2)} <span className="text-xs text-gray-400 font-medium">/ 20</span>
+                    </div>
+                </div>
+                {/* Podium Block */}
+                <div className={`w-full rounded-t-xl shadow-inner flex justify-center items-start pt-4 font-black text-6xl text-white/20 select-none
+                    ${rank === 1 ? 'h-64 bg-yellow-100/50' : rank === 2 ? 'h-48 bg-gray-100' : 'h-32 bg-orange-50'}`}>
+                    {rank}
                 </div>
             </div>
-            <div className="text-center mb-4">
-                <h3 className="font-extrabold text-gray-900 text-lg leading-tight">{student.prenom} {student.nom}</h3>
-                <div className="flex items-center justify-center gap-1 mt-1 text-blue-600 font-black text-xl">
-                    {Number(student.moyenne_cycle).toFixed(2)} <span className="text-xs text-gray-400 font-medium">/ 20</span>
-                </div>
-            </div>
-            {/* Podium Block */}
-            <div className={`w-full rounded-t-xl shadow-inner flex justify-center items-start pt-4 font-black text-6xl text-white/20 select-none
-                ${rank === 1 ? 'h-64 bg-yellow-100/50' : rank === 2 ? 'h-48 bg-gray-100' : 'h-32 bg-orange-50'}`}>
-                {rank}
-            </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <AdminLayout>
@@ -91,10 +110,10 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
 
                             {/* Filter Dropdowns */}
                             {[
-                                { label: 'Year', value: filters.year || '2023-2024' },
-                                { label: 'Speciality', value: filters.speciality || 'Science' },
-                                { label: 'Option', value: filters.option || 'All' },
-                                { label: 'Semester', value: filters.semester ? `Semester ${filters.semester}` : 'Semester 1' }
+                                { label: 'Year', value: safeFilters.year || new Date().getFullYear().toString() },
+                                { label: 'Speciality', value: safeFilters.speciality || 'All' },
+                                { label: 'Option', value: safeFilters.option || 'All' },
+                                { label: 'Semester', value: safeFilters.semester ? `Semester ${safeFilters.semester}` : 'Semester 1' }
                             ].map((filter, idx) => (
                                 <div key={idx} className="relative group">
                                     <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors">
@@ -113,10 +132,10 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    <KpiCard title="Total Students" value={ranking_stats.total_students?.value || '0'} trend={ranking_stats.total_students?.trend} type={ranking_stats.total_students?.trend_type} icon={Users} />
-                    <KpiCard title="Class Average" value={ranking_stats.class_average?.value || '0.00'} trend={ranking_stats.class_average?.trend} type={ranking_stats.class_average?.trend_type} icon={BarChart3} />
-                    <KpiCard title="Pass Rate" value={ranking_stats.pass_rate?.value || '0%'} trend={ranking_stats.pass_rate?.trend} type={ranking_stats.pass_rate?.trend_type} icon={CheckCircle} />
-                    <KpiCard title="Total Absences" value={ranking_stats.total_absences?.value || '0'} trend={ranking_stats.total_absences?.trend} type={ranking_stats.total_absences?.trend_type} icon={AlertTriangle} />
+                    <KpiCard title="Total Students" value={safeRankingStats.total_students?.value || '0'} trend={safeRankingStats.total_students?.trend || null} type={safeRankingStats.total_students?.trend_type || 'up'} icon={Users} />
+                    <KpiCard title="Class Average" value={safeRankingStats.class_average?.value || '0.00'} trend={safeRankingStats.class_average?.trend || null} type={safeRankingStats.class_average?.trend_type || 'up'} icon={BarChart3} />
+                    <KpiCard title="Pass Rate" value={safeRankingStats.pass_rate?.value || '0%'} trend={safeRankingStats.pass_rate?.trend || null} type={safeRankingStats.pass_rate?.trend_type || 'up'} icon={CheckCircle} />
+                    <KpiCard title="Total Absences" value={safeRankingStats.total_absences?.value || '0'} trend={safeRankingStats.total_absences?.trend || null} type={safeRankingStats.total_absences?.trend_type || 'down_good'} icon={AlertTriangle} />
                 </div>
 
                 {/* Podium Section */}
@@ -124,9 +143,9 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                     {/* Crown Icon floating above 1st place */}
                     <Trophy className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-8 text-yellow-500 animate-bounce" />
 
-                    {podium[1] && <PodiumStep student={podium[1]} rank={2} color="bg-gray-400" />}
-                    {podium[0] && <PodiumStep student={podium[0]} rank={1} color="bg-yellow-400" />}
-                    {podium[2] && <PodiumStep student={podium[2]} rank={3} color="bg-orange-400" />}
+                    {safePodium[1] && <PodiumStep student={safePodium[1]} rank={2} color="bg-gray-400" />}
+                    {safePodium[0] && <PodiumStep student={safePodium[0]} rank={1} color="bg-yellow-400" />}
+                    {safePodium[2] && <PodiumStep student={safePodium[2]} rank={3} color="bg-orange-400" />}
                 </div>
 
                 {/* Full Ranking List */}
@@ -162,51 +181,62 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {[...podium, ...others].sort((a, b) => a.rank - b.rank).slice(3).map((student) => (
-                                    <tr key={student.id} className="group hover:bg-blue-50/30 transition-colors">
-                                        <td className="px-6 py-4 font-black text-gray-400 group-hover:text-blue-600">#{student.rank}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-500 overflow-hidden">
-                                                    {student.avatar ? <img src={student.avatar} className="w-full h-full object-cover" /> : `${student.prenom[0]}${student.nom[0]}`}
+                                {[...safePodium, ...safeOthers].filter(s => s && s.rank).sort((a, b) => (a.rank || 0) - (b.rank || 0)).slice(3).map((student) => {
+                                    if (!student) return null;
+                                    const prenom = student.prenom || '';
+                                    const nom = student.nom || '';
+                                    const matricule = student.matricule || 'N/A';
+                                    const s1 = student.s1 || 0;
+                                    const s2 = student.s2 || 0;
+                                    const moyenne_cycle = student.moyenne_cycle || 0;
+                                    const initials = (prenom[0] || '') + (nom[0] || '');
+                                    const rank = student.rank || 0;
+                                    
+                                    return (
+                                        <tr key={student.id || Math.random()} className="group hover:bg-blue-50/30 transition-colors">
+                                            <td className="px-6 py-4 font-black text-gray-400 group-hover:text-blue-600">#{rank}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-500 overflow-hidden">
+                                                        {student.avatar ? <img src={student.avatar} className="w-full h-full object-cover" alt={nom} /> : initials || '?'}
+                                                    </div>
+                                                    <span className="font-bold text-gray-900">{prenom} {nom}</span>
                                                 </div>
-                                                <span className="font-bold text-gray-900">{student.prenom} {student.nom}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm font-medium text-blue-600">{student.matricule}</td>
-                                        <td className="px-6 py-4 text-center font-medium text-gray-600">{student.s1.toFixed(2)}</td>
-                                        <td className="px-6 py-4 text-center font-medium text-gray-600">{student.s2.toFixed(2)}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg">
-                                                {student.moyenne_cycle.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                                    <Eye className="w-4 h-4" />
-                                                </button>
-                                                <button className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-medium text-blue-600">{matricule}</td>
+                                            <td className="px-6 py-4 text-center font-medium text-gray-600">{Number(s1).toFixed(2)}</td>
+                                            <td className="px-6 py-4 text-center font-medium text-gray-600">{Number(s2).toFixed(2)}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg">
+                                                    {Number(moyenne_cycle).toFixed(2)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    <button className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
 
                     {/* Pagination */}
                     <div className="p-4 border-t border-gray-50 flex justify-between items-center text-sm">
-                        <span className="text-gray-500 font-medium">Showing <span className="font-bold text-gray-900">1-5</span> of <span className="font-bold text-gray-900">1,240</span> students</span>
+                        <span className="text-gray-500 font-medium">
+                            Showing <span className="font-bold text-gray-900">4</span> to <span className="font-bold text-gray-900">{Math.min(4 + safeOthers.length, safePodium.length + safeOthers.length)}</span> of <span className="font-bold text-gray-900">{safePodium.length + safeOthers.length}</span> students
+                        </span>
                         <div className="flex items-center gap-2">
-                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50"><ChevronLeft className="w-4 h-4" /></button>
+                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50" disabled><ChevronLeft className="w-4 h-4" /></button>
                             <button className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/30">1</button>
-                            <button className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-50 rounded-lg">2</button>
-                            <button className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-50 rounded-lg">3</button>
-                            <span className="text-gray-400">...</span>
-                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50"><ChevronRight className="w-4 h-4" /></button>
+                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50" disabled><ChevronRight className="w-4 h-4" /></button>
                         </div>
                     </div>
                 </div>

@@ -20,7 +20,7 @@ export default function Login() {
             color: "from-blue-900/90 to-blue-700/80"
         },
         {
-            image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+            image: "https://images.unsplash.com/photo-1564981797816-1043664bf78d?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
             title: "Suivez votre progression",
             description: "Visualisez vos statistiques et classements pour rester motivé tout au long de l'année.",
             color: "from-indigo-900/90 to-purple-800/80"

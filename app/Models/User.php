@@ -10,7 +10,7 @@ class User extends Authenticatable
 {
     use HasFactory;
     protected $fillable = [
-        'matricule', 'role', 'password',
+        'matricule', 'role', 'password', 'student_id',
     ];
 
     protected $hidden = [

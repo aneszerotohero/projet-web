@@ -98,35 +98,107 @@ class AdminDashboardController extends Controller
         }
         
         $filters = $request->only(['annee','specialite_id','option_id','group','search']);
-        $annee = $filters['annee'] ?? 3;
+        $annee = $filters['annee'] ?? date('Y');
         $specialite = $filters['specialite_id'] ?? null;
         $option = $filters['option_id'] ?? null;
         $search = $filters['search'] ?? null;
+        $semestre = $request->get('semester', 1);
 
         $sem1 = 1; $sem2 = 2;
 
-        $query = Student::with('option.specialite');
+        $query = Student::with(['option.specialite', 'user']);
 
         if ($option) $query->where('option_id', $option);
         if ($specialite) $query->whereHas('option', function ($q) use ($specialite) {
             $q->where('specialite_id', $specialite);
         });
+        if ($search) {
+            $query->search($search);
+        }
 
         $students = $query->get()->map(function ($s) use ($sem1,$sem2) {
             $s->s1 = $s->moyenneParSemestre($sem1);
             $s->s2 = $s->moyenneParSemestre($sem2);
             $s->moyenne_cycle = ($s->s1 + $s->s2) / 2;
+            $s->matricule = $s->user?->matricule ?? 'N/A';
             return $s;
         });
 
-        // Sort order: s1, s2, moyenne_cycle (descending)
+        // Sort order: moyenne_cycle (descending)
         $students = $students->sortByDesc('moyenne_cycle')->values();
 
-        // podium
-        $podium = $students->take(3);
-        $others = $students->slice(3);
+        // Add rank to each student
+        $students = $students->map(function ($student, $index) {
+            $student->rank = $index + 1;
+            return $student;
+        });
 
-        $payload = ['podium' => $podium, 'others' => $others];
+        // podium (top 3)
+        $podium = $students->take(3)->values();
+        $others = $students->slice(3)->values();
+
+        // Calculate statistics
+        $totalStudents = $students->count();
+        $classAverage = $students->count() > 0 ? $students->avg('moyenne_cycle') : 0;
+        $passRate = $students->count() > 0 
+            ? ($students->filter(fn($s) => $s->moyenne_cycle >= 10)->count() / $students->count()) * 100 
+            : 0;
+        
+        $totalAbsences = \App\Models\Absence::whereIn('student_id', $students->pluck('id'))->count();
+
+        // Get specialities and options for filters
+        $specialites = \App\Models\Specialite::with('options')->get();
+        $options = \App\Models\Option::all();
+
+        // Get filter labels
+        $specialityLabel = 'All';
+        if ($specialite) {
+            $spec = \App\Models\Specialite::find($specialite);
+            $specialityLabel = $spec ? $spec->libelle : 'All';
+        }
+
+        $optionLabel = 'All';
+        if ($option) {
+            $opt = \App\Models\Option::find($option);
+            $optionLabel = $opt ? $opt->libelle : 'All';
+        }
+
+        $payload = [
+            'podium' => $podium,
+            'others' => $others,
+            'filters' => [
+                'year' => $annee,
+                'speciality' => $specialityLabel,
+                'option' => $optionLabel,
+                'semester' => $semestre
+            ],
+            'ranking_stats' => [
+                'total_students' => [
+                    'value' => number_format($totalStudents, 0, ',', ','),
+                    'trend' => null,
+                    'trend_type' => 'up'
+                ],
+                'class_average' => [
+                    'value' => number_format($classAverage, 2, '.', ''),
+                    'trend' => null,
+                    'trend_type' => $classAverage >= 10 ? 'up' : 'down'
+                ],
+                'pass_rate' => [
+                    'value' => number_format($passRate, 0) . '%',
+                    'trend' => null,
+                    'trend_type' => $passRate >= 50 ? 'up' : 'down'
+                ],
+                'total_absences' => [
+                    'value' => number_format($totalAbsences, 0, ',', ','),
+                    'trend' => null,
+                    'trend_type' => 'down_good'
+                ],
+            ],
+            'available_filters' => [
+                'specialites' => $specialites,
+                'options' => $options,
+            ]
+        ];
 
         if (class_exists(\Inertia\Inertia::class)) {
             return \Inertia\Inertia::render('Admin/Dashboard', $payload);

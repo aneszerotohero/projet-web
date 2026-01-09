@@ -71,16 +71,19 @@ export default function AdminLayout({ children }) {
                     {/* User Info Bottom - Fixed at bottom of sidebar */}
                     <div className="border-t border-gray-200 p-4 shrink-0 bg-white">
                         <div className="flex items-center">
-                            <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                {user.prenom[0]}
-                            </div>
-                            <div className="ml-3">
-                                <p className="text-sm font-medium text-gray-700">{user.prenom} {user.nom}</p>
-                                <Link href="/logout" method="post" className="text-xs text-red-600 hover:text-red-800 flex items-center mt-1">
-                                    <LogOut className="w-3 h-3 mr-1" /> Déconnexion
-                                </Link>
-                            </div>
-                        </div>
+    <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+        {user.prenom?.[0] || 'A'}
+    </div>
+    <div className="ml-3">
+        <p className="text-sm font-medium text-gray-700">
+            {user.prenom || 'Administrateur'} {user.nom || 'Principal'}
+        </p>
+        <Link href="/logout" method="post" className="text-xs text-red-600 hover:text-red-800 flex items-center mt-1">
+            <LogOut className="w-3 h-3 mr-1" /> Déconnexion
+        </Link>
+    </div>
+</div>
+
                     </div>
                 </div>
             </aside>

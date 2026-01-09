@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Absence;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AbsenceController extends Controller
 {
@@ -153,19 +154,60 @@ class AbsenceController extends Controller
 
     public function indexAdmin(Request $request)
     {
-        $query = Absence::with('student','module')->withTrashed();
+        $query = Absence::with(['student.user', 'module'])->withTrashed();
 
         if ($search = $request->get('search')) {
             $query->whereHas('student', function ($q) use ($search) {
                 $q->where('nom', 'like', "%$search%")
                   ->orWhere('prenom', 'like', "%$search%")
-                  ->orWhere('matricule', 'like', "%$search%");
+                  ->orWhereHas('user', function ($q2) use ($search) {
+                      $q2->where('matricule', 'like', "%$search%");
+                  });
             });
+        }
+
+        if ($moduleId = $request->get('module_id')) {
+            $query->where('module_id', $moduleId);
         }
 
         $perPage = (int) $request->get('per_page', 15);
         $absences = $query->orderByDesc('date_absence')->paginate($perPage);
 
         return response()->json($absences);
+    }
+
+    public function stats()
+    {
+        $newAbsencesToday = Absence::whereDate('created_at', today())->count();
+        
+        $mostAbsentModule = Absence::with('module')
+            ->select('module_id', DB::raw('count(*) as total'))
+            ->groupBy('module_id')
+            ->orderByDesc('total')
+            ->first();
+        
+        $warningList = \App\Models\Student::whereHas('absences', function($q) {
+            $q->where('justifie', false);
+        })->get()->filter(function($student) {
+            return $student->absences()->where('justifie', false)->count() >= 3;
+        })->count();
+        
+        return [
+            'new_absences' => [
+                'value' => number_format($newAbsencesToday, 0),
+                'trend' => null,
+                'trend_type' => 'up_bad'
+            ],
+            'most_absent_module' => [
+                'value' => $mostAbsentModule && $mostAbsentModule->module ? $mostAbsentModule->module->libelle : 'N/A',
+                'subtext' => $mostAbsentModule ? $mostAbsentModule->total . ' absences' : 'No data',
+                'icon' => 'Calculator'
+            ],
+            'warning_list' => [
+                'value' => number_format($warningList, 0),
+                'subtext' => 'Students approaching limit',
+                'trend_type' => 'warning'
+            ]
+        ];
     }
 }

@@ -23,21 +23,34 @@ Route::middleware(['auth','auth.admin'])->group(function () {
     Route::get('/admin/dashboard', [\App\Http\Controllers\AdminDashboardController::class, 'index'])->name('admin.dashboard');
     // Admin SPA pages
     Route::get('/admin/notes/manage', function (\Illuminate\Http\Request $request) {
-        $metaResp = app(\App\Http\Controllers\NoteController::class)->meta();
+        $noteController = app(\App\Http\Controllers\NoteController::class);
+        $metaResp = $noteController->meta();
         $meta = $metaResp instanceof \Illuminate\Http\JsonResponse ? $metaResp->getData(true) : $metaResp;
-        $resResp = app(\App\Http\Controllers\NoteController::class)->index($request);
+        
+        // Pass filters to index method
+        $resResp = $noteController->index($request);
         $res = $resResp instanceof \Illuminate\Http\JsonResponse ? $resResp->getData(true) : $resResp;
+        $stats = $noteController->stats();
+        
         return \Inertia\Inertia::render('Admin/Notes', [
             'meta' => $meta,
             'res' => $res,
+            'stats' => $stats,
+            'filters' => $request->only(['search', 'module_id', 'semester', 'coef_id']),
         ]);
     })->name('admin.notes.manage');
 
     Route::get('/admin/absences/manage', function (\Illuminate\Http\Request $request) {
-        $resResp = app(\App\Http\Controllers\AbsenceController::class)->indexAdmin($request);
+        $absenceController = app(\App\Http\Controllers\AbsenceController::class);
+        $resResp = $absenceController->indexAdmin($request);
         $res = $resResp instanceof \Illuminate\Http\JsonResponse ? $resResp->getData(true) : $resResp;
+        $stats = $absenceController->stats();
+        $modules = \App\Models\Module::select('id','libelle')->get();
+        
         return \Inertia\Inertia::render('Admin/Absences', [
             'res' => $res,
+            'stats' => $stats,
+            'modules' => $modules,
         ]);
     })->name('admin.absences.manage');
 
