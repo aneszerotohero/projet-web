@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
-import { router } from '@inertiajs/react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import {
     Download, Plus, Search, Filter, Calendar, FileText, X,
-    MoreHorizontal, ChevronLeft, ChevronRight, TrendingUp, AlertTriangle, CheckCircle, Trash2, Pencil
+    MoreHorizontal, ChevronLeft, ChevronRight, TrendingUp, AlertTriangle, CheckCircle, Trash2, Pencil, ChevronDown
 } from 'lucide-react';
 
-export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: initialFilters = {} }) {
+export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: initialFilters = {}, available_filters = {} }) {
+    const { flash } = usePage().props;
+
     // Safe defaults
     const safeMeta = meta || {};
     const safeRes = res || {};
@@ -15,14 +17,19 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
     const modules = safeMeta.modules || [];
     const coefs = safeMeta.coefs || [];
     const students = safeMeta.students || [];
-    
+    const safeAvailableFilters = available_filters || {};
+    const specialitesByLibelle = safeAvailableFilters.specialites_by_libelle || {};
+    const specialites = safeAvailableFilters.specialites || [];
+    const options = safeAvailableFilters.options || [];
+    const years = safeAvailableFilters.years || [1, 2, 3];
+
     // Format notes for display
     const formattedNotes = notes.map(note => {
         const student = note.student || {};
         const module = note.module || {};
         const coef = note.coef || {};
         const createdAt = note.created_at ? new Date(note.created_at) : new Date();
-        
+
         return {
             id: note.id,
             student_id: student.id,
@@ -42,60 +49,182 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
         };
     });
 
-    const [filters, setFilters] = useState(initialFilters || { search: '', module_id: '', semester: '', coef_id: '' });
+    const [filters, setFilters] = useState(initialFilters || { search: '', module_id: '', semester: '', coef_id: '', annee: '', specialite_id: '', option_id: '' });
+    const [openDropdown, setOpenDropdown] = useState(null);
+    const currentYear = filters.annee || null;
+    const currentSpecialiteId = filters.specialite_id || null;
+    const currentOptionId = filters.option_id || null;
+
+    // Get filtered options based on selected specialite
+    const filteredOptions = currentSpecialiteId
+        ? options.filter(opt => {
+            const specialite = specialites.find(s => s.id == currentSpecialiteId);
+            return specialite && opt.specialite_id == currentSpecialiteId;
+        })
+        : options;
     const [showModal, setShowModal] = useState(false);
     const [editingNote, setEditingNote] = useState(null);
     const [formData, setFormData] = useState({ student_id: '', module_id: '', coef_id: '', note: '' });
     const [errors, setErrors] = useState({});
+    const [studentSearch, setStudentSearch] = useState('');
+    const [studentSearchResults, setStudentSearchResults] = useState([]);
+    const [showStudentResults, setShowStudentResults] = useState(false);
+    const [studentSearchTimeout, setStudentSearchTimeout] = useState(null);
+    const [availableModules, setAvailableModules] = useState(modules); // Modules filtered by student
 
     // Handle filter changes
     const handleFilterChange = useCallback((key, value) => {
         const newFilters = { ...filters, [key]: value };
         setFilters(newFilters);
-        
+
         // Build query params
         const params = {};
         if (newFilters.search) params.search = newFilters.search;
         if (newFilters.module_id) params.module_id = newFilters.module_id;
         if (newFilters.semester) params.semester = newFilters.semester;
         if (newFilters.coef_id) params.coef_id = newFilters.coef_id;
-        
+        if (newFilters.annee) params.annee = newFilters.annee;
+        if (newFilters.specialite_id) params.specialite_id = newFilters.specialite_id;
+        if (newFilters.option_id) params.option_id = newFilters.option_id;
+
         router.get('/admin/notes/manage', params, { preserveState: true, preserveScroll: true });
     }, [filters]);
 
     // Handle search with debounce
     const [searchTimeout, setSearchTimeout] = useState(null);
     const handleSearch = useCallback((value) => {
-        setFilters(prev => ({ ...prev, search: value }));
-        
+        const newFilters = { ...filters, search: value };
+        setFilters(newFilters);
+
         if (searchTimeout) clearTimeout(searchTimeout);
-        
+
         const timeout = setTimeout(() => {
-            const params = { ...filters, search: value };
+            const params = {};
+            if (newFilters.search) params.search = newFilters.search;
+            if (newFilters.module_id) params.module_id = newFilters.module_id;
+            if (newFilters.semester) params.semester = newFilters.semester;
+            if (newFilters.coef_id) params.coef_id = newFilters.coef_id;
+            if (newFilters.annee) params.annee = newFilters.annee;
+            if (newFilters.specialite_id) params.specialite_id = newFilters.specialite_id;
+            if (newFilters.option_id) params.option_id = newFilters.option_id;
             router.get('/admin/notes/manage', params, { preserveState: true, preserveScroll: true });
         }, 500);
-        
+
         setSearchTimeout(timeout);
     }, [filters, searchTimeout]);
+
+    // Handle student search
+    const handleStudentSearch = useCallback((value) => {
+        setStudentSearch(value);
+        setShowStudentResults(value.length >= 2);
+
+        if (studentSearchTimeout) clearTimeout(studentSearchTimeout);
+
+        if (value.length < 2) {
+            setStudentSearchResults([]);
+            return;
+        }
+
+        const timeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/students/search?q=${encodeURIComponent(value)}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setStudentSearchResults(data);
+                }
+            } catch (error) {
+                console.error('Error searching students:', error);
+                setStudentSearchResults([]);
+            }
+        }, 300);
+
+        setStudentSearchTimeout(timeout);
+    }, [studentSearchTimeout]);
+
+    // Select student from search results
+    const selectStudent = async (student) => {
+        setFormData({ ...formData, student_id: student.id, module_id: '' }); // Reset module when student changes
+        setStudentSearch(`${student.prenom} ${student.nom} (${student.matricule})`);
+        setShowStudentResults(false);
+
+        // Load modules for this student
+        try {
+            const response = await fetch(`/api/students/${student.id}/modules`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setAvailableModules(data.modules || []);
+            } else {
+                setAvailableModules(modules); // Fallback to all modules
+            }
+        } catch (error) {
+            console.error('Error loading modules for student:', error);
+            setAvailableModules(modules); // Fallback to all modules
+        }
+    };
 
     // Open modal for create
     const openCreateModal = () => {
         setEditingNote(null);
         setFormData({ student_id: '', module_id: '', coef_id: '', note: '' });
+        setStudentSearch('');
+        setStudentSearchResults([]);
+        setShowStudentResults(false);
         setErrors({});
+        setAvailableModules(modules); // Reset to all modules
         setShowModal(true);
     };
 
     // Open modal for edit
-    const openEditModal = (note) => {
+    const openEditModal = async (note) => {
         setEditingNote(note.rawNote);
+        const student = students.find(s => s.id === note.student_id);
         setFormData({
             student_id: note.student_id || '',
             module_id: note.module_id || '',
             coef_id: note.coef_id || '',
             note: note.grade || ''
         });
+        setStudentSearch(student ? `${student.prenom} ${student.nom}` : '');
+        setStudentSearchResults([]);
+        setShowStudentResults(false);
         setErrors({});
+
+        // Load modules for this student
+        if (note.student_id) {
+            try {
+                const response = await fetch(`/api/students/${note.student_id}/modules`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setAvailableModules(data.modules || []);
+                } else {
+                    setAvailableModules(modules);
+                }
+            } catch (error) {
+                console.error('Error loading modules for student:', error);
+                setAvailableModules(modules);
+            }
+        } else {
+            setAvailableModules(modules);
+        }
+
         setShowModal(true);
     };
 
@@ -103,16 +232,27 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
     const handleSubmit = (e) => {
         e.preventDefault();
         setErrors({});
-        
+
+        // Force strictly clean URLs for PATCH/POST
         const url = editingNote ? `/admin/notes/${editingNote.id}` : '/admin/notes/single';
         const method = editingNote ? 'patch' : 'post';
-        
-        router[method](url, formData, {
-            onSuccess: () => {
+
+        // Ensure formData only contains body fields, not ID
+        const payload = { ...formData };
+        if (editingNote) {
+            // For safety, ensure we aren't passing ID in body (though handled by route)
+        }
+
+        router[method](url, payload, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: (page) => {
                 setShowModal(false);
                 setEditingNote(null);
                 setFormData({ student_id: '', module_id: '', coef_id: '', note: '' });
-                router.reload({ only: ['res', 'stats'] });
+                setStudentSearch('');
+                setStudentSearchResults([]);
+                setShowStudentResults(false);
             },
             onError: (errs) => {
                 setErrors(errs);
@@ -123,19 +263,84 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
     // Handle delete
     const handleDelete = (noteId) => {
         if (!window.confirm('Are you sure you want to delete this note?')) return;
-        
+
         router.delete(`/admin/notes/${noteId}`, {
-            onSuccess: () => {
-                router.reload({ only: ['res', 'stats'] });
+            preserveState: true,
+            preserveScroll: true,
+            onError: (errs) => {
+                alert('Error deleting note: ' + (errs.message || 'Unknown error'));
             }
         });
     };
 
     // Clear filters
     const clearFilters = () => {
-        setFilters({ search: '', module_id: '', semester: '', coef_id: '' });
+        setFilters({ search: '', module_id: '', semester: '', coef_id: '', annee: '', specialite_id: '', option_id: '' });
         router.get('/admin/notes/manage', {}, { preserveState: true });
     };
+
+    // Apply filters helper
+    const applyFilters = useCallback((newFilters) => {
+        const updatedFilters = { ...filters, ...newFilters };
+        setFilters(updatedFilters);
+
+        const params = {};
+        // Build params avoiding collisions
+        if (updatedFilters.search) params.search = updatedFilters.search;
+        if (updatedFilters.module_id) params.module_id = updatedFilters.module_id;
+        if (updatedFilters.semester) params.semester = updatedFilters.semester;
+        if (updatedFilters.coef_id) params.coef_id = updatedFilters.coef_id;
+
+        // Year filter (independent)
+        if (updatedFilters.annee !== undefined && updatedFilters.annee !== null) {
+            params.annee = updatedFilters.annee;
+        }
+
+        // Speciality filter (independent, but when year is set, auto-select matching)
+        if (updatedFilters.specialite_id !== undefined) {
+            if (updatedFilters.specialite_id === null) {
+                params.specialite_id = '';
+            } else {
+                params.specialite_id = updatedFilters.specialite_id;
+            }
+        }
+
+        // Option filter (depends on specialite)
+        if (updatedFilters.option_id !== undefined) {
+            if (updatedFilters.option_id === null) {
+                params.option_id = '';
+            } else {
+                params.option_id = updatedFilters.option_id;
+            }
+        }
+
+        router.get('/admin/notes/manage', params, {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['res', 'stats', 'filters', 'available_filters']
+        });
+    }, [filters]);
+
+    // Dropdown component
+    const Dropdown = ({ label, value, isOpen, onToggle, children }) => (
+        <div className="relative">
+            <button
+                onClick={onToggle}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors whitespace-nowrap min-w-[120px]"
+            >
+                <span className="truncate max-w-[180px]">{label}: {value}</span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenDropdown(null)}></div>
+                    <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto z-[101]">
+                        {children}
+                    </div>
+                </>
+            )}
+        </div>
+    );
 
     const KpiCard = ({ title, value, trend, trendType, icon: Icon, color }) => (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36 relative overflow-hidden">
@@ -159,9 +364,23 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
         </div>
     );
 
+    // Show flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            // You can add a toast notification here if needed
+            console.log('Success:', flash.success);
+        }
+    }, [flash]);
+
     return (
         <AdminLayout>
             <div className="p-8 max-w-7xl mx-auto bg-gray-50/50 min-h-screen font-sans">
+                {/* Flash Messages */}
+                {flash?.success && (
+                    <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 font-medium">
+                        {flash.success}
+                    </div>
+                )}
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div>
@@ -169,11 +388,35 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                         <p className="text-gray-500 mt-1 text-sm">Manage student grades, coefficients, and academic records.</p>
                     </div>
                     <div className="flex gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-sm">
+                        <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-sm cursor-pointer">
                             <FileText className="w-4 h-4" />
                             Import CSV
-                        </button>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm">
+                            <input
+                                type="file"
+                                accept=".csv,.txt"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const formData = new FormData();
+                                        formData.append('file', file);
+                                        router.post('/admin/notes/import', formData, {
+                                            forceFormData: true,
+                                            onSuccess: () => {
+                                                // Success, automatic reload handled by Inertia
+                                            },
+                                            onError: (errors) => {
+                                                console.error('Import errors:', errors);
+                                            }
+                                        });
+                                    }
+                                }}
+                            />
+                        </label>
+                        <button
+                            onClick={openCreateModal}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm"
+                        >
                             <Plus className="w-4 h-4" />
                             Add New Grade
                         </button>
@@ -189,64 +432,164 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
 
                 {/* Filters */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div className="md:col-span-1">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Search Student</label>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filters:</span>
+
+                            {/* Year Dropdown */}
+                            <Dropdown
+                                label="Year"
+                                value={currentYear ? `Year ${currentYear}` : 'All'}
+                                isOpen={openDropdown === 'year'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: null, specialite_id: currentSpecialiteId, option_id: currentOptionId })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Years
+                                    </button>
+                                    {years.map(year => (
+                                        <button
+                                            key={year}
+                                            onClick={() => applyFilters({ annee: year, specialite_id: currentSpecialiteId, option_id: currentOptionId })}
+                                            className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentYear == year ? 'bg-blue-50 text-blue-600' : ''}`}
+                                        >
+                                            Year {year}
+                                        </button>
+                                    ))}
+                                </div>
+                            </Dropdown>
+
+                            {/* Speciality Dropdown */}
+                            <Dropdown
+                                label="Speciality"
+                                value={currentSpecialiteId ? (specialites.find(s => s.id == currentSpecialiteId)?.libelle || 'All') : 'All'}
+                                isOpen={openDropdown === 'speciality'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'speciality' ? null : 'speciality')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Specialities
+                                    </button>
+                                    {Object.keys(specialitesByLibelle).length > 0 ? (
+                                        Object.values(specialitesByLibelle).map((group) => {
+                                            if (!group || !group.libelle) return null;
+                                            let selectedSpec = null;
+                                            if (currentYear && group.specialites) {
+                                                selectedSpec = group.specialites.find(s => s.annee == currentYear);
+                                            }
+                                            if (!selectedSpec && group.specialites && group.specialites.length > 0) {
+                                                selectedSpec = group.specialites[0];
+                                            }
+                                            const isSelected = selectedSpec && currentSpecialiteId == selectedSpec.id;
+                                            return (
+                                                <button
+                                                    key={group.libelle}
+                                                    onClick={() => {
+                                                        const specToSelect = currentYear && group.specialites
+                                                            ? group.specialites.find(s => s.annee == currentYear) || group.specialites[0]
+                                                            : group.specialites[0];
+                                                        if (specToSelect) {
+                                                            applyFilters({ annee: currentYear, specialite_id: specToSelect.id, option_id: null });
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${isSelected ? 'bg-blue-50 text-blue-600' : ''}`}
+                                                >
+                                                    {group.libelle}
+                                                </button>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="px-4 py-2 text-sm text-gray-500">No specialities available</div>
+                                    )}
+                                </div>
+                            </Dropdown>
+
+                            {/* Option Dropdown */}
+                            <Dropdown
+                                label="Option"
+                                value={currentOptionId ? (filteredOptions.find(o => o.id == currentOptionId)?.libelle || 'All') : 'All'}
+                                isOpen={openDropdown === 'option'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'option' ? null : 'option')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: null })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Options
+                                    </button>
+                                    {filteredOptions.length > 0 ? (
+                                        filteredOptions.map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: opt.id })}
+                                                className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentOptionId == opt.id ? 'bg-blue-50 text-blue-600' : ''}`}
+                                            >
+                                                {opt.libelle}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-2 text-sm text-gray-500">No options available</div>
+                                    )}
+                                </div>
+                            </Dropdown>
+                        </div>
+
+                        <div className="flex-1"></div>
+
+                        {/* Search and other filters */}
+                        <div className="flex items-center gap-3 flex-wrap">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
                                     value={filters.search}
                                     onChange={(e) => handleSearch(e.target.value)}
-                                    placeholder="Name or Student ID..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+                                    placeholder="Search student..."
+                                    className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
                                 />
                             </div>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Module</label>
-                            <select 
+                            <select
                                 value={filters.module_id}
                                 onChange={(e) => handleFilterChange('module_id', e.target.value)}
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="">All Modules</option>
                                 {modules.map((module) => (
                                     <option key={module.id} value={module.id}>{module.libelle}</option>
                                 ))}
                             </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Semester</label>
-                            <select 
+                            <select
                                 value={filters.semester}
                                 onChange={(e) => handleFilterChange('semester', e.target.value)}
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="">All Semesters</option>
-                                <option value="1">Semester 1</option>
-                                <option value="2">Semester 2</option>
+                                {[1, 2, 3, 4, 5, 6].map(sem => (
+                                    <option key={sem} value={sem}>S{sem}</option>
+                                ))}
                             </select>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Grade Type</label>
-                                <select 
-                                    value={filters.coef_id}
-                                    onChange={(e) => handleFilterChange('coef_id', e.target.value)}
-                                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="">All Types</option>
-                                    {coefs.map((coef) => (
-                                        <option key={coef.id} value={coef.id}>{coef.libelle}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button 
-                                onClick={clearFilters}
-                                className="text-sm font-bold text-blue-600 hover:text-blue-800 mb-1 self-end"
+                            <select
+                                value={filters.coef_id}
+                                onChange={(e) => handleFilterChange('coef_id', e.target.value)}
+                                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                Clear Filters
+                                <option value="">All Types</option>
+                                {coefs.map((coef) => (
+                                    <option key={coef.id} value={coef.id}>{coef.libelle}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={clearFilters}
+                                className="text-sm font-bold text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                            >
+                                Reset Filters
                             </button>
                         </div>
                     </div>
@@ -282,9 +625,9 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         const studentInitial = note.student.name ? note.student.name.charAt(0).toUpperCase() : '?';
                                         const typeColor = note.type === 'Exam' ? 'bg-purple-100 text-purple-700' :
                                             note.type === 'DS' ? 'bg-blue-100 text-blue-700' :
-                                            note.type === 'TP' ? 'bg-green-100 text-green-700' :
-                                            'bg-gray-100 text-gray-700';
-                                        
+                                                note.type === 'TP' ? 'bg-green-100 text-green-700' :
+                                                    'bg-gray-100 text-gray-700';
+
                                         return (
                                             <tr key={note.id} className="group hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4">
@@ -317,24 +660,24 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                                 </td>
                                                 <td className="px-6 py-4 font-bold text-gray-900">{Number(note.coeff).toFixed(1)}</td>
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-500">{note.date}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <button 
-                                                    onClick={() => openEditModal(note)}
-                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDelete(note.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => openEditModal(note)}
+                                                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(note.id)}
+                                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         );
                                     })
@@ -350,9 +693,17 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             </span>
                             <div className="flex items-center gap-2">
                                 {safeRes.current_page > 1 ? (
-                                    <button 
+                                    <button
                                         onClick={() => {
-                                            const params = { ...filters, page: safeRes.current_page - 1 };
+                                            const params = {};
+                                            if (filters.search) params.search = filters.search;
+                                            if (filters.module_id) params.module_id = filters.module_id;
+                                            if (filters.semester) params.semester = filters.semester;
+                                            if (filters.coef_id) params.coef_id = filters.coef_id;
+                                            if (filters.annee) params.annee = filters.annee;
+                                            if (filters.specialite_id) params.specialite_id = filters.specialite_id;
+                                            if (filters.option_id) params.option_id = filters.option_id;
+                                            params.page = safeRes.current_page - 1;
                                             router.get('/admin/notes/manage', params, { preserveState: true, preserveScroll: true });
                                         }}
                                         className="px-4 py-2 border border-gray-200 rounded-lg text-gray-600 font-bold hover:bg-gray-50 transition-colors"
@@ -377,14 +728,21 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         <button
                                             key={pageNum}
                                             onClick={() => {
-                                                const params = { ...filters, page: pageNum };
+                                                const params = {};
+                                                if (filters.search) params.search = filters.search;
+                                                if (filters.module_id) params.module_id = filters.module_id;
+                                                if (filters.semester) params.semester = filters.semester;
+                                                if (filters.coef_id) params.coef_id = filters.coef_id;
+                                                if (filters.annee) params.annee = filters.annee;
+                                                if (filters.specialite_id) params.specialite_id = filters.specialite_id;
+                                                if (filters.option_id) params.option_id = filters.option_id;
+                                                params.page = pageNum;
                                                 router.get('/admin/notes/manage', params, { preserveState: true, preserveScroll: true });
                                             }}
-                                            className={`w-8 h-8 flex items-center justify-center font-bold rounded-lg ${
-                                                safeRes.current_page === pageNum
-                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                                                    : 'text-gray-600 hover:bg-gray-50'
-                                            }`}
+                                            className={`w-8 h-8 flex items-center justify-center font-bold rounded-lg ${safeRes.current_page === pageNum
+                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                                }`}
                                         >
                                             {pageNum}
                                         </button>
@@ -393,7 +751,15 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                 {safeRes.current_page < safeRes.last_page ? (
                                     <button
                                         onClick={() => {
-                                            const params = { ...filters, page: safeRes.current_page + 1 };
+                                            const params = {};
+                                            if (filters.search) params.search = filters.search;
+                                            if (filters.module_id) params.module_id = filters.module_id;
+                                            if (filters.semester) params.semester = filters.semester;
+                                            if (filters.coef_id) params.coef_id = filters.coef_id;
+                                            if (filters.annee) params.annee = filters.annee;
+                                            if (filters.specialite_id) params.specialite_id = filters.specialite_id;
+                                            if (filters.option_id) params.option_id = filters.option_id;
+                                            params.page = safeRes.current_page + 1;
                                             router.get('/admin/notes/manage', params, { preserveState: true, preserveScroll: true });
                                         }}
                                         className="px-4 py-2 text-gray-600 font-bold hover:text-blue-600"
@@ -430,26 +796,48 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            {/* Student Select */}
-                            <div>
+                            {/* Student Search */}
+                            <div className="relative">
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
                                     Student *
                                 </label>
-                                <select
-                                    value={formData.student_id}
-                                    onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${
-                                        errors.student_id ? 'border-red-500' : 'border-gray-200'
-                                    }`}
-                                    required
-                                >
-                                    <option value="">Select Student</option>
-                                    {students.map((student) => (
-                                        <option key={student.id} value={student.id}>
-                                            {student.prenom} {student.nom}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={studentSearch}
+                                        onChange={(e) => handleStudentSearch(e.target.value)}
+                                        onFocus={() => studentSearch.length >= 2 && setShowStudentResults(true)}
+                                        placeholder="Search by name or matricule..."
+                                        className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${errors.student_id ? 'border-red-500' : 'border-gray-200'
+                                            }`}
+                                        required={!editingNote}
+                                        disabled={!!editingNote}
+                                    />
+                                    {showStudentResults && studentSearchResults.length > 0 && (
+                                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                            {studentSearchResults.map((student) => (
+                                                <button
+                                                    key={student.id}
+                                                    type="button"
+                                                    onClick={() => selectStudent(student)}
+                                                    className="w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                                >
+                                                    <div className="font-medium text-gray-900">
+                                                        {student.prenom} {student.nom}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {student.matricule} • {student.option}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {showStudentResults && studentSearch.length >= 2 && studentSearchResults.length === 0 && (
+                                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 text-sm text-gray-500">
+                                            No students found
+                                        </div>
+                                    )}
+                                </div>
                                 {errors.student_id && (
                                     <p className="mt-1 text-sm text-red-600">{errors.student_id}</p>
                                 )}
@@ -463,13 +851,15 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                 <select
                                     value={formData.module_id}
                                     onChange={(e) => setFormData({ ...formData, module_id: e.target.value })}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${
-                                        errors.module_id ? 'border-red-500' : 'border-gray-200'
-                                    }`}
+                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${errors.module_id ? 'border-red-500' : 'border-gray-200'
+                                        }`}
                                     required
+                                    disabled={!formData.student_id}
                                 >
-                                    <option value="">Select Module</option>
-                                    {modules.map((module) => (
+                                    <option value="">
+                                        {!formData.student_id ? 'Select a student first' : 'Select Module'}
+                                    </option>
+                                    {availableModules.map((module) => (
                                         <option key={module.id} value={module.id}>
                                             {module.libelle} (S{module.semestre})
                                         </option>
@@ -488,9 +878,8 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                 <select
                                     value={formData.coef_id}
                                     onChange={(e) => setFormData({ ...formData, coef_id: e.target.value })}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${
-                                        errors.coef_id ? 'border-red-500' : 'border-gray-200'
-                                    }`}
+                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${errors.coef_id ? 'border-red-500' : 'border-gray-200'
+                                        }`}
                                     required
                                 >
                                     <option value="">Select Type</option>
@@ -517,9 +906,8 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                     max="20"
                                     value={formData.note}
                                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${
-                                        errors.note ? 'border-red-500' : 'border-gray-200'
-                                    }`}
+                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${errors.note ? 'border-red-500' : 'border-gray-200'
+                                        }`}
                                     required
                                 />
                                 {errors.note && (

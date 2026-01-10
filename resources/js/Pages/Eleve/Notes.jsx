@@ -1,248 +1,263 @@
-import React from 'react';
-import StudentLayout from '../../Layouts/StudentLayout';
-import { Printer, Download, TrendingUp, AlertTriangle, AlertCircle, Search, ChevronLeft, ChevronRight, CheckCircle, BarChart3, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Search, Filter, BookOpen, Calculator, Calendar } from 'lucide-react';
 
-export default function Notes({ student, stats, grade_distribution, performance_trend, detailed_grades, modules = [], coefs = [], semestre = 1, general_moy }) {
-
-    // Helper for visual trend line (simplified for mock data)
-    const TrendLine = ({ data, color = 'blue' }) => (
-        <div className="flex items-end h-32 gap-4 pt-4 px-4">
-            {data?.data?.map((val, idx) => (
-                <div key={idx} className="flex flex-col items-center flex-1 gap-2 group">
-                    <div className="relative w-full flex justify-center items-end h-full">
-                        <div
-                            className={`w-3 h-3 rounded-full border-2 border-${color}-500 bg-white z-10 transition-all group-hover:scale-125`}
-                            style={{ marginBottom: `${(val / 20) * 80}%` }}
-                        ></div>
-                        <div
-                            className={`absolute bottom-0 w-0.5 bg-${color}-100 h-full`}
-                            style={{ height: `${(val / 20) * 80}%` }}
-                        ></div>
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 uppercase">{data.months[idx]}</span>
+// Use a simple layout placeholder or import your actual layout
+// Assuming existing AdminLayout or creating a new StudentLayout later.
+// For now, using a simple wrapper.
+const StudentLayout = ({ children }) => (
+    <div className="min-h-screen bg-gray-50 font-sans">
+        <nav className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                <span className="font-bold text-xl text-blue-600">My Portal</span>
+                <div className="flex gap-4">
+                    <a href="/student/dashboard" className="text-gray-600 hover:text-blue-600">Dashboard</a>
+                    <a href="/student/notes" className="text-blue-600 font-bold">Notes</a>
+                    <a href="/student/absences" className="text-gray-600 hover:text-blue-600">Absences</a>
                 </div>
-            ))}
-        </div>
-    );
+            </div>
+        </nav>
+        <main className="p-4 md:p-8 max-w-7xl mx-auto">
+            {children}
+        </main>
+    </div>
+);
+
+export default function StudentNotes() {
+    const [notes, setNotes] = useState([]);
+    const [modules, setModules] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState({
+        search: '',
+        module_id: '',
+        semester: '',
+        annee: ''
+    });
+    const [pagination, setPagination] = useState({});
+
+    // AbortController ref for cancelling previous requests
+    const abortControllerRef = useRef(null);
+
+    // Fetch available modules
+    useEffect(() => {
+        fetch('/api/student/modules')
+            .then(res => res.json())
+            .then(data => setModules(data.modules || []))
+            .catch(err => console.error('Error fetching modules:', err));
+    }, []);
+
+    // Fetch notes with filters
+    const fetchNotes = useCallback(async (currentFilters = filters, page = 1) => {
+        // Cancel previous request if exists
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        // Create new AbortController
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        setLoading(true);
+        try {
+            const queryParams = new URLSearchParams({
+                page: page,
+                ...currentFilters
+            });
+
+            // Remove empty filters
+            Array.from(queryParams.keys()).forEach(key => {
+                if (!queryParams.get(key)) queryParams.delete(key);
+            });
+
+            const response = await fetch(`/api/student/notes?${queryParams.toString()}`, {
+                signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setNotes(data.data);
+                setPagination({
+                    current_page: data.current_page,
+                    last_page: data.last_page,
+                    total: data.total,
+                    from: data.from,
+                    to: data.to
+                });
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error fetching notes:', error);
+            }
+        } finally {
+            if (!signal.aborted) {
+                setLoading(false);
+            }
+        }
+    }, []);
+
+    // Initial fetch
+    useEffect(() => {
+        fetchNotes(filters, 1);
+    }, []);
+
+    // Debounced filter change handler
+    const [filterTimeout, setFilterTimeout] = useState(null);
+
+    const handleFilterChange = (key, value) => {
+        const newFilters = { ...filters, [key]: value };
+        setFilters(newFilters);
+
+        if (filterTimeout) clearTimeout(filterTimeout);
+
+        const timeout = setTimeout(() => {
+            fetchNotes(newFilters, 1);
+        }, 300); // 300ms debounce
+
+        setFilterTimeout(timeout);
+    };
 
     return (
         <StudentLayout>
-            <div className="p-8 max-w-7xl mx-auto bg-gray-50/50 min-h-screen">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                    <div>
-                        <h1 className="text-3xl font-black text-gray-900">Student Grades</h1>
-                        <p className="text-gray-600 mt-1">
-                            Academic Year {student?.academic_year || '2023-2024'} • <span className="font-bold text-blue-600">{student?.class_name || '12th Grade'}</span>
-                        </p>
-                    </div>
-                    <div className="flex gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm">
-                            <Printer className="w-4 h-4" />
-                            Print
-                        </button>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5 text-sm">
-                            <Download className="w-4 h-4" />
-                            Export PDF
-                        </button>
-                    </div>
+            <Head title="My Grades" />
+
+            <div className="mb-8">
+                <h1 className="text-3xl font-black text-gray-900">My Grades</h1>
+                <p className="text-gray-500 mt-1">View your academic performance and grades.</p>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-center">
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                        type="text"
+                        placeholder="Search module..."
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+                    />
                 </div>
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* General Average */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">General Average</h3>
-                            <BarChart3 className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-3xl font-black text-gray-900">{Number(stats?.general_avg || general_moy || 0).toFixed(2)}</span>
-                            <span className="text-gray-400 font-medium text-lg">/20</span>
-                            <span className="bg-green-100 text-green-700 text-xs font-bold px-1.5 py-0.5 rounded ml-2">+0.5</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2 font-medium">Passing ({stats?.passing_status || 'Admis'})</p>
-                    </div>
+                <select
+                    value={filters.module_id}
+                    onChange={(e) => handleFilterChange('module_id', e.target.value)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                >
+                    <option value="">All Modules</option>
+                    {modules.map(m => (
+                        <option key={m.id} value={m.id}>{m.libelle}</option>
+                    ))}
+                </select>
 
-                    {/* Highest Module */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Highest Module</h3>
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                        </div>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-3xl font-black text-gray-900">{Number(stats?.highest_module?.score || 18.00).toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-900 font-bold mt-2">{stats?.highest_module?.name || 'Physics'}</p>
-                    </div>
+                <select
+                    value={filters.semester}
+                    onChange={(e) => handleFilterChange('semester', e.target.value)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                >
+                    <option value="">All Semesters</option>
+                    {[1, 2, 3, 4, 5, 6].map(s => (
+                        <option key={s} value={s}>Semester {s}</option>
+                    ))}
+                </select>
+            </div>
 
-                    {/* Lowest Module */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Lowest Module</h3>
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
-                        </div>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-3xl font-black text-gray-900">{Number(stats?.lowest_module?.score || 9.00).toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-900 font-bold mt-2">{stats?.lowest_module?.name || 'History'}</p>
-                    </div>
-
-                    {/* Absences */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Total Absences</h3>
-                            <XCircle className="w-5 h-5 text-orange-500" />
-                        </div>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-3xl font-black text-gray-900">{stats?.total_absences?.hours || 4}</span>
-                            <span className="text-gray-400 font-medium text-sm">hours</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2 font-medium">{stats?.total_absences?.unjustified || 2} Unjustified</p>
-                    </div>
-                </div>
-
-                {/* Analysis Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    {/* Grade Distribution */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="font-bold text-gray-900 text-lg">Grade Distribution</h3>
-                                <p className="text-gray-500 text-xs mt-1">Number of modules by grade range</p>
-                            </div>
-                            <span className="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-1 rounded">Trimestre {semestre}</span>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-4 h-32 items-end px-2">
-                            {['0-9', '10-12', '12-15', '18-20'].map((range, idx) => {
-                                const count = grade_distribution ? Object.values(grade_distribution)[idx] : [2, 5, 8, 4][idx];
-                                const color = ['red', 'gray', 'blue', 'purple'][idx];
-                                return (
-                                    <div key={idx} className="flex flex-col items-center gap-2 group w-full">
-                                        <div className={`w-full h-1 ${idx === 2 ? 'bg-blue-500' : (idx === 3 ? 'bg-purple-500' : (idx === 0 ? 'bg-red-500' : 'bg-gray-400'))} rounded-full`}></div>
-                                        <span className="text-xs font-bold text-gray-500">{range}</span>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                        <div className="flex justify-between mt-2 px-2 text-xs font-bold text-gray-400">
-                            <span>0-9</span><span>10-12</span><span>15-18</span><span>18-20</span>
-                        </div>
-                    </div>
-
-                    {/* Performance Trend */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <div className="mb-4">
-                            <h3 className="font-bold text-gray-900 text-lg">Performance Trend</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <h2 className="text-3xl font-black text-gray-900">Trending Up</h2>
-                                <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">+12%</span>
-                            </div>
-                        </div>
-                        <TrendLine data={performance_trend || { months: ['SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB'], data: [10, 11, 11.5, 13, 14, 15] }} />
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
-                    <div className="flex gap-4 w-full md:w-auto">
-                        <div className="flex flex-col gap-1 w-full md:w-48">
-                            <label className="text-xs font-bold text-gray-700">Semester</label>
-                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                <option>2nd Trimestre</option>
-                                <option>1st Trimestre</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1 w-full md:w-48">
-                            <label className="text-xs font-bold text-gray-700">Module</label>
-                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                <option>All Modules</option>
-                                <option>Math</option>
-                                <option>Physics</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="w-full md:w-auto flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-700">Search</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search className="w-4 h-4 text-gray-400" />
-                            </div>
-                            <input type="text" className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full md:w-64 pl-10 p-2.5" placeholder="Search by grade or note..." />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Detailed Grades Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                        <h2 className="font-bold text-gray-900 text-lg">Detailed Grades Report</h2>
-                        <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">24 Results</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-bold tracking-wider">
+            {/* Content */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-bold border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4">Module</th>
+                                <th className="px-6 py-4">Semester</th>
+                                <th className="px-6 py-4">Type</th>
+                                <th className="px-6 py-4">Grade</th>
+                                <th className="px-6 py-4">Coef</th>
+                                <th className="px-6 py-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {loading ? (
                                 <tr>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Module</th>
-                                    <th className="px-6 py-4">Type</th>
-                                    <th className="px-6 py-4 text-center">Coef.</th>
-                                    <th className="px-6 py-4 text-right">Grade (/20)</th>
-                                    <th className="px-6 py-4 text-right">Weighted</th>
-                                    <th className="px-6 py-4 text-center">Status</th>
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">Loading grades...</td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {detailed_grades?.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
-                                        <td className="px-6 py-4 font-medium text-gray-900">{item.date}</td>
-                                        <td className="px-6 py-4 font-bold text-gray-800">{item.module}</td>
+                            ) : notes.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">No grades found.</td>
+                                </tr>
+                            ) : (
+                                notes.map(note => (
+                                    <tr key={note.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-gray-800">
+                                            {note.module?.libelle || 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                            S{note.module?.semestre || '?'}
+                                        </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide
-                                                ${item.type?.includes('DS') ? 'bg-blue-50 text-blue-700' :
-                                                    item.type?.includes('Examen') ? 'bg-purple-50 text-purple-700' :
-                                                        item.type?.includes('TP') ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`
-                                            }>
-                                                {item.type}
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${note.coef?.libelle === 'Exam' ? 'bg-purple-100 text-purple-700' :
+                                                    'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                {note.coef?.libelle || 'N/A'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-center text-blue-600 font-semibold">{item.coef}</td>
-                                        <td className="px-6 py-4 text-right font-black text-gray-900">{Number(item.grade).toFixed(2)}</td>
-                                        <td className="px-6 py-4 text-right text-gray-500 font-medium">{Number(item.weighted).toFixed(2)}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            {item.status === 'passed' ? (
-                                                <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
-                                            ) : (
-                                                <AlertCircle className="w-5 h-5 text-red-500 mx-auto" />
-                                            )}
+                                        <td className="px-6 py-4">
+                                            <span className={`text-lg font-black ${note.note >= 10 ? 'text-green-600' : 'text-red-500'
+                                                }`}>
+                                                {Number(note.note).toFixed(2)}
+                                            </span>
+                                            <span className="text-gray-300 text-sm ml-1">/20</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-600 font-medium">
+                                            {note.coef?.coef || 1}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('Request correction for this grade?')) {
+                                                        router.post('/student/notes/correction', { note_id: note.id });
+                                                    }
+                                                }}
+                                                className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                                            >
+                                                Request Correction
+                                            </button>
                                         </td>
                                     </tr>
-                                )) || (
-                                        <tr>
-                                            <td colSpan="7" className="px-6 py-8 text-center text-gray-500">No detailed grades available.</td>
-                                        </tr>
-                                    )}
-                            </tbody>
-                        </table>
-                    </div>
-                    {/* Pagination */}
-                    <div className="p-4 border-t border-gray-50 flex justify-between items-center">
-                        <span className="text-xs font-semibold text-gray-500">Showing 1 to 6 of 24 grades</span>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination */}
+                {!loading && pagination.last_page > 1 && (
+                    <div className="p-4 border-t border-gray-100 flex justify-between items-center text-sm">
+                        <span className="text-gray-500">
+                            Showing <span className="font-bold">{pagination.from}</span> to <span className="font-bold">{pagination.to}</span> of <span className="font-bold">{pagination.total}</span>
+                        </span>
                         <div className="flex gap-2">
-                            <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-400 disabled:opacity-50">
-                                <ChevronLeft className="w-4 h-4" />
+                            <button
+                                disabled={pagination.current_page === 1}
+                                onClick={() => fetchNotes(filters, pagination.current_page - 1)}
+                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Previous
                             </button>
-                            <button className="px-3 py-1 bg-blue-600 text-white font-bold rounded-lg text-sm shadow-md shadow-blue-500/20">1</button>
-                            <button className="px-3 py-1 border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold rounded-lg text-sm">2</button>
-                            <button className="px-3 py-1 border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold rounded-lg text-sm">3</button>
-                            <span className="px-2 py-1 text-gray-400">...</span>
-                            <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
-                                <ChevronRight className="w-4 h-4" />
+                            <button
+                                disabled={pagination.current_page === pagination.last_page}
+                                onClick={() => fetchNotes(filters, pagination.current_page + 1)}
+                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Next
                             </button>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </StudentLayout>
     );

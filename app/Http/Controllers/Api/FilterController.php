@@ -31,7 +31,26 @@ class FilterController extends Controller
     public function searchStudents(Request $request)
     {
         $term = $request->get('q');
-        $students = Student::search($term)->with('user')->limit(20)->get();
+        if (!$term || strlen($term) < 2) {
+            return response()->json([]);
+        }
+        
+        $students = Student::search($term)
+            ->with(['user:id,student_id,matricule'])
+            ->select('id', 'nom', 'prenom', 'option_id')
+            ->with('option:id,libelle')
+            ->limit(20)
+            ->get()
+            ->map(function ($student) {
+                return [
+                    'id' => $student->id,
+                    'nom' => $student->nom,
+                    'prenom' => $student->prenom,
+                    'matricule' => $student->user?->matricule ?? 'N/A',
+                    'option' => $student->option?->libelle ?? 'N/A',
+                ];
+            });
+        
         return response()->json($students);
     }
 }

@@ -80,7 +80,7 @@ export default function Login() {
                         <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg border border-white/10">
                             <GraduationCap className="w-8 h-8 text-white" />
                         </div>
-                        <span className="text-2xl font-bold tracking-wide">Projetschool</span>
+                        <a href="/"><span className="text-2xl font-bold tracking-wide">Projet school</span></a>
                     </div>
                 </div>
 

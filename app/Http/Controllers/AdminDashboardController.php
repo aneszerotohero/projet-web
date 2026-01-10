@@ -98,34 +98,64 @@ class AdminDashboardController extends Controller
         }
         
         $filters = $request->only(['annee','specialite_id','option_id','group','search']);
-        $annee = $filters['annee'] ?? date('Y');
+        $annee = $filters['annee'] ?? null; // annee = 1, 2, ou 3 (année dans la spécialité)
         $specialite = $filters['specialite_id'] ?? null;
         $option = $filters['option_id'] ?? null;
         $search = $filters['search'] ?? null;
-        $semestre = $request->get('semester', 1);
-
-        $sem1 = 1; $sem2 = 2;
+        $semestre = $request->get('semester'); // S1-S6 ou null pour moyenne de cycle
 
         $query = Student::with(['option.specialite', 'user']);
 
-        if ($option) $query->where('option_id', $option);
-        if ($specialite) $query->whereHas('option', function ($q) use ($specialite) {
-            $q->where('specialite_id', $specialite);
-        });
+        if ($option) {
+            $query->where('option_id', $option);
+        }
+        if ($specialite) {
+            $query->whereHas('option', function ($q) use ($specialite) {
+                $q->where('specialite_id', $specialite);
+            });
+        }
+        // Filter by annee (année dans la spécialité: 1, 2, ou 3)
+        if ($annee) {
+            $query->whereHas('option.specialite', function ($q) use ($annee) {
+                $q->where('annee', $annee);
+            });
+        }
         if ($search) {
             $query->search($search);
         }
 
-        $students = $query->get()->map(function ($s) use ($sem1,$sem2) {
-            $s->s1 = $s->moyenneParSemestre($sem1);
-            $s->s2 = $s->moyenneParSemestre($sem2);
-            $s->moyenne_cycle = ($s->s1 + $s->s2) / 2;
+        $students = $query->get()->map(function ($s) use ($semestre) {
             $s->matricule = $s->user?->matricule ?? 'N/A';
+            
+            if ($semestre && $semestre !== 'cycle') {
+                // Calculate average for specific semester (S1-S6)
+                $sem = (int) $semestre;
+                $s->moyenne_semestre = $s->moyenneParSemestre($sem);
+                // For display purposes, keep s1 and s2 for compatibility
+                $s->s1 = $sem <= 2 ? ($sem === 1 ? $s->moyenne_semestre : 0) : 0;
+                $s->s2 = $sem <= 2 ? ($sem === 2 ? $s->moyenne_semestre : 0) : 0;
+                $s->moyenne_cycle = $s->moyenne_semestre;
+            } else {
+                // Calculate cycle average: average of all existing semesters (S1-S6)
+                $moyennes = [];
+                for ($i = 1; $i <= 6; $i++) {
+                    $moy = $s->moyenneParSemestre($i);
+                    if ($moy > 0) {
+                        $moyennes[] = $moy;
+                    }
+                }
+                $s->moyenne_cycle = count($moyennes) > 0 ? array_sum($moyennes) / count($moyennes) : 0;
+                // For display, calculate S1 and S2 if they exist
+                $s->s1 = $s->moyenneParSemestre(1);
+                $s->s2 = $s->moyenneParSemestre(2);
+            }
+            
             return $s;
         });
 
-        // Sort order: moyenne_cycle (descending)
-        $students = $students->sortByDesc('moyenne_cycle')->values();
+        // Sort order: moyenne_cycle (descending) or moyenne_semestre if specific semester
+        $sortKey = ($semestre && $semestre !== 'cycle') ? 'moyenne_semestre' : 'moyenne_cycle';
+        $students = $students->sortByDesc($sortKey)->values();
 
         // Add rank to each student
         $students = $students->map(function ($student, $index) {
@@ -149,12 +179,20 @@ class AdminDashboardController extends Controller
         // Get specialities and options for filters
         $specialites = \App\Models\Specialite::with('options')->get();
         $options = \App\Models\Option::all();
+        
+        // Group specialites by libelle only (without year)
+        $specialitesByLibelle = $specialites->groupBy('libelle')->map(function ($group) {
+            return [
+                'libelle' => $group->first()->libelle,
+                'specialites' => $group->values() // All specialites with this libelle (different years)
+            ];
+        });
 
         // Get filter labels
         $specialityLabel = 'All';
         if ($specialite) {
             $spec = \App\Models\Specialite::find($specialite);
-            $specialityLabel = $spec ? $spec->libelle : 'All';
+            $specialityLabel = $spec ? $spec->libelle : 'All'; // Only libelle, no year
         }
 
         $optionLabel = 'All';
@@ -162,15 +200,21 @@ class AdminDashboardController extends Controller
             $opt = \App\Models\Option::find($option);
             $optionLabel = $opt ? $opt->libelle : 'All';
         }
+        
+        $yearLabel = $annee ? 'Année ' . $annee : 'All';
 
         $payload = [
             'podium' => $podium,
             'others' => $others,
             'filters' => [
                 'year' => $annee,
+                'year_label' => $yearLabel,
                 'speciality' => $specialityLabel,
+                'specialite_id' => $specialite,
                 'option' => $optionLabel,
-                'semester' => $semestre
+                'option_id' => $option,
+                'semester' => $semestre ?? 'cycle',
+                'search' => $search
             ],
             'ranking_stats' => [
                 'total_students' => [
@@ -196,7 +240,18 @@ class AdminDashboardController extends Controller
             ],
             'available_filters' => [
                 'specialites' => $specialites,
+                'specialites_by_libelle' => $specialitesByLibelle, // Grouped by libelle only
                 'options' => $options,
+                'years' => [1, 2, 3], // Années possibles dans une spécialité
+                'semesters' => [
+                    ['value' => 'cycle', 'label' => 'Moyenne de cycle'],
+                    ['value' => 1, 'label' => 'S1 (1ère année - 1er semestre)'],
+                    ['value' => 2, 'label' => 'S2 (1ère année - 2e semestre)'],
+                    ['value' => 3, 'label' => 'S3 (2e année - 1er semestre)'],
+                    ['value' => 4, 'label' => 'S4 (2e année - 2e semestre)'],
+                    ['value' => 5, 'label' => 'S5 (3e année - 1er semestre)'],
+                    ['value' => 6, 'label' => 'S6 (3e année - 2e semestre)'],
+                ]
             ]
         ];
 

@@ -69,21 +69,21 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Créer les spécialités.
+     * Chaque spécialité a exactement 3 années (annee = 1, 2, 3)
      */
     private function createSpecialites(): array
     {
-        $specialitesData = [
-            ['libelle' => 'Informatique', 'annee' => 2024],
-            ['libelle' => 'Informatique', 'annee' => 2025],
-            ['libelle' => 'Électronique', 'annee' => 2024],
-            ['libelle' => 'Électronique', 'annee' => 2025],
-            ['libelle' => 'Mécanique', 'annee' => 2024],
-            ['libelle' => 'Mécanique', 'annee' => 2025],
-        ];
-
+        $specialitesLibelles = ['Informatique', 'Électronique', 'Mécanique'];
         $specialites = [];
-        foreach ($specialitesData as $data) {
-            $specialites[] = Specialite::create($data);
+
+        foreach ($specialitesLibelles as $libelle) {
+            // Créer les 3 années pour chaque spécialité
+            for ($annee = 1; $annee <= 3; $annee++) {
+                $specialites[] = Specialite::create([
+                    'libelle' => $libelle,
+                    'annee' => $annee,
+                ]);
+            }
         }
 
         return $specialites;
@@ -91,31 +91,25 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Créer les options.
+     * Chaque option correspond à (spécialité + année)
      */
     private function createOptions(array $specialites): array
     {
-        $optionsData = [
-            ['specialite_libelle' => 'Informatique', 'annee' => 2024, 'libelle' => 'Génie Logiciel'],
-            ['specialite_libelle' => 'Informatique', 'annee' => 2024, 'libelle' => 'Réseaux et Télécommunications'],
-            ['specialite_libelle' => 'Informatique', 'annee' => 2025, 'libelle' => 'Génie Logiciel'],
-            ['specialite_libelle' => 'Informatique', 'annee' => 2025, 'libelle' => 'Réseaux et Télécommunications'],
-            ['specialite_libelle' => 'Électronique', 'annee' => 2024, 'libelle' => 'Électronique Analogique'],
-            ['specialite_libelle' => 'Électronique', 'annee' => 2024, 'libelle' => 'Électronique Numérique'],
-            ['specialite_libelle' => 'Électronique', 'annee' => 2025, 'libelle' => 'Électronique Analogique'],
-            ['specialite_libelle' => 'Mécanique', 'annee' => 2024, 'libelle' => 'Conception Mécanique'],
-            ['specialite_libelle' => 'Mécanique', 'annee' => 2025, 'libelle' => 'Conception Mécanique'],
+        $optionsConfig = [
+            'Informatique' => ['Génie Logiciel', 'Réseaux et Télécommunications'],
+            'Électronique' => ['Électronique Analogique', 'Électronique Numérique'],
+            'Mécanique' => ['Conception Mécanique'],
         ];
 
         $options = [];
-        foreach ($optionsData as $data) {
-            $specialite = collect($specialites)->first(function ($spec) use ($data) {
-                return $spec->libelle === $data['specialite_libelle'] && $spec->annee === $data['annee'];
-            });
-
-            if ($specialite) {
+        
+        foreach ($specialites as $specialite) {
+            $libelles = $optionsConfig[$specialite->libelle] ?? [];
+            
+            foreach ($libelles as $libelle) {
                 $options[] = Option::create([
                     'specialite_id' => $specialite->id,
-                    'libelle' => $data['libelle'],
+                    'libelle' => $libelle,
                 ]);
             }
         }
@@ -146,32 +140,71 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Créer les modules.
+     * Modules pour S1-S6 selon la logique métier :
+     * S1 = 1ère année - 1er semestre
+     * S2 = 1ère année - 2e semestre
+     * S3 = 2e année - 1er semestre
+     * S4 = 2e année - 2e semestre
+     * S5 = 3e année - 1er semestre
+     * S6 = 3e année - 2e semestre
      */
     private function createModules(): array
     {
         $modulesData = [
-            // Semestre 1
-            ['libelle' => 'Mathématiques', 'semestre' => 1, 'coef' => 3.0],
-            ['libelle' => 'Physique', 'semestre' => 1, 'coef' => 2.5],
-            ['libelle' => 'Algorithmique', 'semestre' => 1, 'coef' => 2.0],
-            ['libelle' => 'Base de données', 'semestre' => 1, 'coef' => 2.0],
-            ['libelle' => 'Programmation', 'semestre' => 1, 'coef' => 3.0],
-            ['libelle' => 'Anglais', 'semestre' => 1, 'coef' => 1.0],
-            ['libelle' => 'Économie', 'semestre' => 1, 'coef' => 1.0],
+            // S1 - 1ère année - 1er semestre
+            ['libelle' => 'Mathématiques I', 'semestre' => 1],
+            ['libelle' => 'Physique I', 'semestre' => 1],
+            ['libelle' => 'Algorithmique', 'semestre' => 1],
+            ['libelle' => 'Base de données I', 'semestre' => 1],
+            ['libelle' => 'Programmation I', 'semestre' => 1],
+            ['libelle' => 'Anglais I', 'semestre' => 1],
+            ['libelle' => 'Économie', 'semestre' => 1],
             
-            // Semestre 2
-            ['libelle' => 'Réseaux', 'semestre' => 2, 'coef' => 2.5],
-            ['libelle' => 'Systèmes d\'exploitation', 'semestre' => 2, 'coef' => 2.0],
-            ['libelle' => 'Gestion de projet', 'semestre' => 2, 'coef' => 2.0],
-            ['libelle' => 'Statistiques', 'semestre' => 2, 'coef' => 2.0],
-            ['libelle' => 'Chimie', 'semestre' => 2, 'coef' => 2.0],
-            ['libelle' => 'Communication', 'semestre' => 2, 'coef' => 1.0],
-            ['libelle' => 'Recherche opérationnelle', 'semestre' => 2, 'coef' => 2.0],
+            // S2 - 1ère année - 2e semestre
+            ['libelle' => 'Réseaux I', 'semestre' => 2],
+            ['libelle' => 'Systèmes d\'exploitation I', 'semestre' => 2],
+            ['libelle' => 'Gestion de projet I', 'semestre' => 2],
+            ['libelle' => 'Statistiques I', 'semestre' => 2],
+            ['libelle' => 'Mathématiques II', 'semestre' => 2],
+            ['libelle' => 'Communication', 'semestre' => 2],
+            
+            // S3 - 2e année - 1er semestre
+            ['libelle' => 'Mathématiques III', 'semestre' => 3],
+            ['libelle' => 'Base de données avancées', 'semestre' => 3],
+            ['libelle' => 'Programmation avancée', 'semestre' => 3],
+            ['libelle' => 'Architecture des systèmes', 'semestre' => 3],
+            ['libelle' => 'Anglais II', 'semestre' => 3],
+            ['libelle' => 'Gestion d\'entreprise', 'semestre' => 3],
+            
+            // S4 - 2e année - 2e semestre
+            ['libelle' => 'Réseaux avancés', 'semestre' => 4],
+            ['libelle' => 'Systèmes d\'exploitation avancés', 'semestre' => 4],
+            ['libelle' => 'Sécurité informatique', 'semestre' => 4],
+            ['libelle' => 'Statistiques II', 'semestre' => 4],
+            ['libelle' => 'Intelligence artificielle', 'semestre' => 4],
+            ['libelle' => 'Droit informatique', 'semestre' => 4],
+            
+            // S5 - 3e année - 1er semestre
+            ['libelle' => 'Projet de fin d\'études I', 'semestre' => 5],
+            ['libelle' => 'Architecture logicielle', 'semestre' => 5],
+            ['libelle' => 'Cloud Computing', 'semestre' => 5],
+            ['libelle' => 'Big Data', 'semestre' => 5],
+            ['libelle' => 'Management de projet', 'semestre' => 5],
+            ['libelle' => 'Anglais technique', 'semestre' => 5],
+            
+            // S6 - 3e année - 2e semestre
+            ['libelle' => 'Projet de fin d\'études II', 'semestre' => 6],
+            ['libelle' => 'Stage en entreprise', 'semestre' => 6],
+            ['libelle' => 'Innovation et entrepreneuriat', 'semestre' => 6],
+            ['libelle' => 'Éthique professionnelle', 'semestre' => 6],
         ];
 
         $modules = [];
         foreach ($modulesData as $data) {
-            $modules[] = Module::create($data);
+            $modules[] = Module::create([
+                'libelle' => $data['libelle'],
+                'semestre' => $data['semestre'],
+            ]);
         }
 
         return $modules;
@@ -304,8 +337,16 @@ class DatabaseSeeder extends Seeder
                     ]);
                 }
 
+                $moduleLibelle = $module->libelle;
+                
                 // Créer une note TP pour les modules techniques
-                if ($tpCoef && in_array($module->libelle, ['Programmation', 'Base de données', 'Réseaux', 'Systèmes d\'exploitation'])) {
+                $isTechnical = str_contains($moduleLibelle, 'Programmation') || 
+                              str_contains($moduleLibelle, 'Base de données') || 
+                              str_contains($moduleLibelle, 'Réseaux') || 
+                              str_contains($moduleLibelle, 'Systèmes') ||
+                              str_contains($moduleLibelle, 'Cloud') ||
+                              str_contains($moduleLibelle, 'Big Data');
+                if ($tpCoef && $isTechnical) {
                     Note::create([
                         'student_id' => $student->id,
                         'module_id' => $module->id,
@@ -325,7 +366,10 @@ class DatabaseSeeder extends Seeder
                 }
 
                 // Créer une note Contrôle Continu pour certains modules
-                if ($ccCoef && in_array($module->libelle, ['Anglais', 'Communication', 'Économie'])) {
+                $isLanguage = str_contains($moduleLibelle, 'Anglais') || 
+                             str_contains($moduleLibelle, 'Communication') || 
+                             str_contains($moduleLibelle, 'Économie');
+                if ($ccCoef && $isLanguage) {
                     Note::create([
                         'student_id' => $student->id,
                         'module_id' => $module->id,
@@ -335,7 +379,10 @@ class DatabaseSeeder extends Seeder
                 }
 
                 // Créer une note Projet pour certains modules
-                if ($projetCoef && in_array($module->libelle, ['Gestion de projet', 'Programmation'])) {
+                $isProject = str_contains($moduleLibelle, 'Projet') || 
+                            str_contains($moduleLibelle, 'Stage') ||
+                            str_contains($moduleLibelle, 'Gestion de projet');
+                if ($projetCoef && $isProject) {
                     Note::create([
                         'student_id' => $student->id,
                         'module_id' => $module->id,

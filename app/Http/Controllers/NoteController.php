@@ -15,15 +15,16 @@ class NoteController extends Controller
             'student_id' => 'required|exists:students,id',
             'module_id' => 'required|exists:modules,id',
             'coef_id' => 'required|exists:coef,id',
-            'note' => 'required|numeric',
+            'note' => 'required|numeric|min:0|max:20',
         ]);
 
-        $note = Note::updateOrCreate(
+        Note::updateOrCreate(
             ['student_id' => $data['student_id'], 'module_id' => $data['module_id'], 'coef_id' => $data['coef_id']],
             ['note' => $data['note']]
         );
 
-        return response()->json($note);
+        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
+        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note created successfully');
     }
 
     // bulk creation: array of notes
@@ -37,18 +38,16 @@ class NoteController extends Controller
             'notes.*.note' => 'required|numeric',
         ]);
 
-        $created = [];
-
-        DB::transaction(function () use ($payload, &$created) {
+        DB::transaction(function () use ($payload) {
             foreach ($payload['notes'] as $n) {
-                $created[] = Note::updateOrCreate(
+                Note::updateOrCreate(
                     ['student_id' => $n['student_id'], 'module_id' => $n['module_id'], 'coef_id' => $n['coef_id']],
                     ['note' => $n['note']]
                 );
             }
         });
 
-        return response()->json($created);
+        return redirect()->back()->with('success', 'Notes imported successfully');
     }
 
     public function index(Request $request)
@@ -81,6 +80,27 @@ class NoteController extends Controller
             $query->where('coef_id', $coefId);
         }
 
+        // Filter by speciality (by libelle)
+        if ($specialiteId = $request->get('specialite_id')) {
+            $query->whereHas('student.option.specialite', function ($q) use ($specialiteId) {
+                $q->where('id', $specialiteId);
+            });
+        }
+
+        // Filter by year
+        if ($annee = $request->get('annee')) {
+            $query->whereHas('student.option.specialite', function ($q) use ($annee) {
+                $q->where('annee', $annee);
+            });
+        }
+
+        // Filter by option
+        if ($optionId = $request->get('option_id')) {
+            $query->whereHas('student', function ($q) use ($optionId) {
+                $q->where('option_id', $optionId);
+            });
+        }
+
         $perPage = (int) $request->get('per_page', 15);
         $notes = $query->orderByDesc('created_at')->paginate($perPage);
 
@@ -102,18 +122,21 @@ class NoteController extends Controller
             'student_id' => 'sometimes|exists:students,id',
             'module_id' => 'sometimes|exists:modules,id',
             'coef_id' => 'sometimes|exists:coef,id',
-            'note' => 'required|numeric',
+            'note' => 'required|numeric|min:0|max:20',
         ]);
 
         $note->update($data);
 
-        return response()->json($note);
+        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
+        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note updated successfully');
     }
 
-    public function destroy(Note $note)
+    public function destroy(Request $request, Note $note)
     {
         $note->delete();
-        return response()->json(['deleted' => true]);
+        
+        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
+        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note deleted successfully');
     }
 
     public function stats()
@@ -142,5 +165,93 @@ class NoteController extends Controller
                 'trend_type' => 'up'
             ]
         ];
+    }
+
+    public function importCsv(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        $data = array_map('str_getcsv', file($path));
+        
+        // Skip header row
+        $header = array_shift($data);
+        
+        $imported = 0;
+        $errors = [];
+        
+        DB::transaction(function () use ($data, &$imported, &$errors) {
+            foreach ($data as $index => $row) {
+                try {
+                    // Expected CSV format: student_matricule, module_libelle, coef_libelle, note
+                    if (count($row) < 4) {
+                        $errors[] = "Row " . ($index + 2) . ": Insufficient columns";
+                        continue;
+                    }
+                    
+                    $matricule = trim($row[0]);
+                    $moduleLibelle = trim($row[1]);
+                    $coefLibelle = trim($row[2]);
+                    $note = (float) trim($row[3]);
+                    
+                    // Find student by matricule
+                    $student = \App\Models\Student::whereHas('user', function($q) use ($matricule) {
+                        $q->where('matricule', $matricule);
+                    })->first();
+                    
+                    if (!$student) {
+                        $errors[] = "Row " . ($index + 2) . ": Student with matricule '{$matricule}' not found";
+                        continue;
+                    }
+                    
+                    // Find module
+                    $module = \App\Models\Module::where('libelle', $moduleLibelle)->first();
+                    if (!$module) {
+                        $errors[] = "Row " . ($index + 2) . ": Module '{$moduleLibelle}' not found";
+                        continue;
+                    }
+                    
+                    // Find coef
+                    $coef = \App\Models\Coef::where('libelle', $coefLibelle)->first();
+                    if (!$coef) {
+                        $errors[] = "Row " . ($index + 2) . ": Coefficient '{$coefLibelle}' not found";
+                        continue;
+                    }
+                    
+                    // Validate note
+                    if ($note < 0 || $note > 20) {
+                        $errors[] = "Row " . ($index + 2) . ": Note must be between 0 and 20";
+                        continue;
+                    }
+                    
+                    // Create or update note
+                    Note::updateOrCreate(
+                        [
+                            'student_id' => $student->id,
+                            'module_id' => $module->id,
+                            'coef_id' => $coef->id,
+                        ],
+                        ['note' => $note]
+                    );
+                    
+                    $imported++;
+                } catch (\Exception $e) {
+                    $errors[] = "Row " . ($index + 2) . ": " . $e->getMessage();
+                }
+            }
+        });
+
+        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
+        $message = "Imported {$imported} notes successfully";
+        if (count($errors) > 0) {
+            $message .= " with " . count($errors) . " errors";
+        }
+        
+        return redirect()->route('admin.notes.manage', $filters)
+            ->with('success', $message)
+            ->with('import_errors', $errors);
     }
 }

@@ -19,4 +19,9 @@ class Specialite extends Model
     {
         return $this->hasMany(Option::class);
     }
+
+    public function modules()
+    {
+        return $this->hasMany(Module::class);
+    }
 }

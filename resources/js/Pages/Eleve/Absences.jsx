@@ -1,239 +1,255 @@
-import React from 'react';
-import StudentLayout from '../../Layouts/StudentLayout';
-import { Printer, Download, AlertTriangle, AlertCircle, CheckCircle, Clock, RotateCcw, Calendar, FileText, Ban } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Search, Calendar, FileText, CheckCircle, Clock } from 'lucide-react';
 
-export default function Absences({ student, stats, trends, absences = [] }) {
-
-    // Helper to render the Trend Chart
-    const TrendChart = ({ data }) => (
-        <div className="flex h-32 items-end justify-between px-4 sm:px-12 pt-6">
-            {data?.data?.map((val, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-2 w-full group cursor-default">
-                    <div className="relative flex justify-center w-full h-full items-end">
-                        {/* Line Connector (Simplified) */}
-                        {idx < data.data.length - 1 && (
-                            <div
-                                className="absolute top-0 right-[-50%] w-full h-0.5 bg-blue-100 transform origin-left rotate-[12deg]"
-                                style={{ top: `${100 - (val / 5) * 100}%`, transform: `rotate(${((data.data[idx + 1] - val) * 5)}deg)` }}
-                            ></div>
-                        )}
-                        <div
-                            className="z-10 w-3 h-3 bg-white border-2 border-blue-500 rounded-full hover:scale-125 transition-transform"
-                            style={{ marginBottom: `${(val / 5) * 70}px` }}
-                        ></div>
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 uppercase">{data.months[idx]}</span>
+const StudentLayout = ({ children }) => (
+    <div className="min-h-screen bg-gray-50 font-sans">
+        <nav className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                <span className="font-bold text-xl text-blue-600">My Portal</span>
+                <div className="flex gap-4">
+                    <a href="/student/dashboard" className="text-gray-600 hover:text-blue-600">Dashboard</a>
+                    <a href="/student/notes" className="text-gray-600 hover:text-blue-600">Notes</a>
+                    <a href="/student/absences" className="text-blue-600 font-bold">Absences</a>
                 </div>
-            ))}
-        </div>
-    );
+            </div>
+        </nav>
+        <main className="p-4 md:p-8 max-w-7xl mx-auto">
+            {children}
+        </main>
+    </div>
+);
+
+export default function StudentAbsences() {
+    const [absences, setAbsences] = useState([]);
+    const [modules, setModules] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState({
+        module_id: '',
+        status: '',
+        date: ''
+    });
+    const [pagination, setPagination] = useState({});
+
+    // AbortController ref
+    const abortControllerRef = useRef(null);
+
+    // Fetch modules for filter
+    useEffect(() => {
+        fetch('/api/student/modules')
+            .then(res => res.json())
+            .then(data => setModules(data.modules || []))
+            .catch(err => console.error('Error fetching modules:', err));
+    }, []);
+
+    // Fetch absences
+    const fetchAbsences = useCallback(async (currentFilters = filters, page = 1) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
+        setLoading(true);
+        try {
+            const queryParams = new URLSearchParams({
+                page: page,
+                ...currentFilters
+            });
+
+            Array.from(queryParams.keys()).forEach(key => {
+                if (!queryParams.get(key)) queryParams.delete(key);
+            });
+
+            const response = await fetch(`/api/student/absences?${queryParams.toString()}`, {
+                signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setAbsences(data.data);
+                setPagination({
+                    current_page: data.current_page,
+                    last_page: data.last_page,
+                    total: data.total,
+                    from: data.from,
+                    to: data.to
+                });
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error fetching absences:', error);
+            }
+        } finally {
+            if (!signal.aborted) {
+                setLoading(false);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAbsences(filters, 1);
+    }, []);
+
+    const handleFilterChange = (key, value) => {
+        const newFilters = { ...filters, [key]: value };
+        setFilters(newFilters);
+        fetchAbsences(newFilters, 1);
+    };
+
+    const handleRequestJustification = (absenceId) => {
+        if (confirm('Submit a justification request for this absence?')) {
+            router.post('/student/absences/request', { absence_id: absenceId }, {
+                onSuccess: () => alert('Justification request submitted.')
+            });
+        }
+    };
 
     return (
         <StudentLayout>
-            <div className="p-8 max-w-7xl mx-auto bg-gray-50/50 min-h-screen">
-                {/* Header Section */}
-                <div className="mb-8">
+            <Head title="My Absences" />
 
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h1 className="text-3xl font-black text-gray-900">Student Absences</h1>
-                            <p className="text-gray-600 mt-1">
-                                Academic Year {student?.academic_year || '2023-2024'} • <span className="font-bold text-gray-800">{student?.term || 'Term 1'}</span>
-                            </p>
-                        </div>
-                        <div className="flex gap-3">
-                            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm">
-                                <Printer className="w-4 h-4" />
-                                Print List
-                            </button>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5 text-sm">
-                                <Download className="w-4 h-4" />
-                                Download Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div className="mb-8">
+                <h1 className="text-3xl font-black text-gray-900">My Absences</h1>
+                <p className="text-gray-500 mt-1">Track your attendance and manage justifications.</p>
+            </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Total Hours Missed */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-40">
-                        <div className="flex justify-between items-start">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Total Hours Missed</h3>
-                            <div className="p-1.5 bg-red-50 rounded-lg">
-                                <Ban className="w-5 h-5 text-red-500" />
-                            </div>
-                        </div>
-                        <div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-gray-900">{stats?.total_hours || 0}</span>
-                                <span className="text-2xl font-bold text-gray-900">hrs</span>
-                            </div>
-                            <p className="text-xs text-red-500 font-bold mt-1">+{stats?.since_last_month || 0}hrs <span className="text-gray-400 font-medium">since last month</span></p>
-                        </div>
-                    </div>
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-center">
+                <select
+                    value={filters.module_id}
+                    onChange={(e) => handleFilterChange('module_id', e.target.value)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                >
+                    <option value="">All Modules</option>
+                    {modules.map(m => (
+                        <option key={m.id} value={m.id}>{m.libelle}</option>
+                    ))}
+                </select>
 
-                    {/* Justified Absences */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-40">
-                        <div className="flex justify-between items-start">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Justified Absences</h3>
-                            <div className="p-1.5 bg-green-50 rounded-lg">
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                            </div>
-                        </div>
-                        <div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-gray-900">{stats?.justified_hours || 0}</span>
-                                <span className="text-2xl font-bold text-gray-900">hrs</span>
-                            </div>
-                            <div className="w-16 h-1.5 bg-green-500 rounded-full mt-3"></div>
-                        </div>
-                    </div>
+                <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="Justified">Justified</option>
+                    <option value="Unjustified">Unjustified</option>
+                    <option value="Pending">Pending</option>
+                </select>
 
-                    {/* Unjustified Absences */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-40">
-                        <div className="flex justify-between items-start">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Unjustified Absences</h3>
-                            <div className="p-1.5 bg-orange-50 rounded-lg">
-                                <AlertTriangle className="w-5 h-5 text-orange-500" />
-                            </div>
-                        </div>
-                        <div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-gray-900">{stats?.unjustified_hours || 0}</span>
-                                <span className="text-2xl font-bold text-gray-900">hrs</span>
-                            </div>
-                            <div className="w-8 h-1.5 bg-orange-500 rounded-full mt-3"></div>
-                        </div>
-                    </div>
+                <input
+                    type="date"
+                    value={filters.date}
+                    onChange={(e) => handleFilterChange('date', e.target.value)}
+                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                />
+            </div>
 
-                    {/* Deleted Records */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-40">
-                        <div className="flex justify-between items-start">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Deleted Records</h3>
-                            <div className="p-1.5 bg-gray-50 rounded-lg">
-                                <RotateCcw className="w-5 h-5 text-gray-500" />
-                            </div>
-                        </div>
-                        <div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-gray-900">{stats?.deleted_records || 0}</span>
-                            </div>
-                            <p className="text-xs text-gray-500 font-medium mt-1">Admin corrections</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Trends Section */}
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8 relative">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">Absence Trends</h3>
-                        <span className="bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">Last 6 Months</span>
-                    </div>
-                    {/* Simplified Chart Area */}
-                    <div className="h-40 w-full border-t border-dashed border-gray-100 mt-4 relative">
-                        <TrendChart data={trends || { months: ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'], data: [0, 0, 0, 0, 0, 0] }} />
-                    </div>
-                </div>
-
-                {/* History Section */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="flex items-center gap-3">
-                            <h2 className="font-bold text-gray-900 text-lg">Absence History</h2>
-                            <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">Total {absences.length}</span>
-                        </div>
-
-                        <div className="flex gap-2 text-sm">
-                            <div className="relative">
-                                <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-lg py-2 pl-3 pr-8 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer">
-                                    <option>All Modules</option>
-                                    <option>Math</option>
-                                </select>
-                            </div>
-                            <div className="relative">
-                                <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-lg py-2 pl-3 pr-8 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer">
-                                    <option>Newest First</option>
-                                    <option>Oldest First</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-bold tracking-wider">
+            {/* Content */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-bold border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4">Date</th>
+                                <th className="px-6 py-4">Module</th>
+                                <th className="px-6 py-4">Duration</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {loading ? (
                                 <tr>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Module / Time</th>
-                                    <th className="px-6 py-4">Type</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Details / Reason</th>
+                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-400">Loading absences...</td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {absences.map((item, idx) => (
-                                    <tr key={idx} className={`group transition-colors ${item.is_deleted ? 'bg-red-50/30' : 'hover:bg-gray-50/50'}`}>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3 text-gray-900 font-bold">
-                                                <Calendar className="w-4 h-4 text-gray-400" />
-                                                {item.date}
-                                            </div>
+                            ) : absences.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-400">No absences recorded.</td>
+                                </tr>
+                            ) : (
+                                absences.map(absence => (
+                                    <tr key={absence.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-gray-800">
+                                            {formatDate(absence.date)}
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-700">
+                                            {absence.module?.libelle || 'N/A'}
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-600">
+                                            {absence.number_of_hours || 1.5}h
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div>
-                                                <div className="font-bold text-gray-900">{item.module}</div>
-                                                <div className="text-xs text-gray-500 font-medium mt-0.5">{item.time}</div>
-                                            </div>
+                                            <StatusBadge status={absence.status} />
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${item.type === 'Unjustified' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                                                item.type === 'Justified' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                    'bg-gray-100 text-gray-500 border-gray-200'
-                                                }`}>
-                                                {item.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {item.is_deleted ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Deleted
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span> Active Record
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {item.is_deleted ? (
-                                                <div className="flex items-start gap-2 text-red-600 text-xs font-medium italic">
-                                                    <AlertCircle className="w-4 h-4 shrink-0" />
-                                                    {item.details}
-                                                </div>
-                                            ) : item.details.includes('.pdf') ? (
-                                                <a href="#" className="flex items-center gap-2 text-gray-900 font-bold text-xs underline decoration-gray-300 hover:text-blue-600 hover:decoration-blue-600 transition-all">
-                                                    <FileText className="w-4 h-4 text-gray-400" />
-                                                    {item.details}
-                                                </a>
-                                            ) : (
-                                                <span className="text-gray-400">-</span>
+                                            {absence.status === 'Unjustified' && (
+                                                <button
+                                                    onClick={() => handleRequestJustification(absence.id)}
+                                                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                                >
+                                                    <FileText className="w-3 h-3" />
+                                                    Justify
+                                                </button>
                                             )}
                                         </td>
                                     </tr>
-                                ))}
-                                {absences.length === 0 && (
-                                    <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center text-gray-400 italic">
-                                            No absences recorded for this term.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
+
+                {/* Pagination */}
+                {!loading && pagination.last_page > 1 && (
+                    <div className="p-4 border-t border-gray-100 flex justify-between items-center text-sm">
+                        <span className="text-gray-500">
+                            Showing <span className="font-bold">{pagination.from}</span> to <span className="font-bold">{pagination.to}</span>
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                disabled={pagination.current_page === 1}
+                                onClick={() => fetchAbsences(filters, pagination.current_page - 1)}
+                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                disabled={pagination.current_page === pagination.last_page}
+                                onClick={() => fetchAbsences(filters, pagination.current_page + 1)}
+                                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </StudentLayout>
     );
 }
+
+const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+};
+
+const StatusBadge = ({ status }) => {
+    let styles = "bg-gray-100 text-gray-700";
+    if (status === 'Justified') styles = "bg-green-100 text-green-700";
+    if (status === 'Unjustified') styles = "bg-red-100 text-red-700";
+    if (status === 'Pending') styles = "bg-yellow-100 text-yellow-700";
+
+    return (
+        <span className={`px-2 py-1 rounded text-xs font-bold ${styles}`}>
+            {status || 'Unknown'}
+        </span>
+    );
+};

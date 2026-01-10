@@ -2,7 +2,20 @@ import React from 'react';
 import StudentLayout from '../../Layouts/StudentLayout';
 import { Calendar, Download, TrendingUp, BarChart3, AlertTriangle, ChevronRight, FileText, Clock, Mail } from 'lucide-react';
 
-export default function Dashboard({ student, semestre, annee = '2023-2024', moyenne_semestre, moyenne_generale, progression_semestre, progression_generale, moyennes_par_module, absences_stats, chart_data }) {
+export default function Dashboard({
+    student = {},
+    semestre = 1,
+    annee = '2023-2024',
+    moyenne_semestre = 0,
+    moyenne_generale = 0,
+    progression_semestre = 0,
+    progression_generale = 0,
+    moyennes_par_module = [],
+    absences_stats = {},
+    chart_data = {}
+}) {
+    // Ensure arrays
+    const safeMoyennes = Array.isArray(moyennes_par_module) ? moyennes_par_module : [];
 
     // Helper for rendering trend indicators
     const TrendIndicator = ({ value, label }) => {
@@ -123,7 +136,7 @@ export default function Dashboard({ student, semestre, annee = '2023-2024', moye
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {moyennes_par_module && moyennes_par_module.map((mod, idx) => (
+                                        {safeMoyennes.map((mod, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
                                                 <td className="px-6 py-4 font-bold text-gray-800 flex items-center gap-3">
                                                     <span className={`w-2 h-2 rounded-full ${mod.moyenne >= 10 ? 'bg-blue-500' : 'bg-red-500'}`}></span>

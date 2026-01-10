@@ -94,12 +94,17 @@ class AbsenceController extends Controller
             'student_id' => 'required|exists:students,id',
             'module_id' => 'required|exists:modules,id',
             'date_absence' => 'required|date',
-            'motif_absence' => 'required|string',
-            'motif_suppression' => 'nullable|string',
+            'motif_absence' => 'required|string|max:500',
+            'motif_suppression' => 'nullable|string|max:500',
             'justifie' => 'sometimes|boolean',
         ]);
 
         $absence = Absence::create($data);
+
+        // For Inertia requests, redirect back to manage page
+        if ($request->header('X-Inertia')) {
+            return redirect()->route('admin.absences.manage')->with('success', 'Absence recorded successfully');
+        }
 
         return response()->json($absence);
     }
@@ -108,12 +113,18 @@ class AbsenceController extends Controller
     {
         $data = $request->validate([
             'date_absence' => 'sometimes|date',
-            'motif_absence' => 'sometimes|string',
-            'motif_suppression' => 'nullable|string',
+            'motif_absence' => 'sometimes|string|max:500',
+            'motif_suppression' => 'nullable|string|max:500',
             'justifie' => 'sometimes|boolean',
         ]);
 
         $absence->update($data);
+
+        // For Inertia requests, redirect back to manage page with current filters
+        if ($request->header('X-Inertia')) {
+            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
+            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence updated successfully');
+        }
 
         return response()->json($absence);
     }
@@ -121,7 +132,7 @@ class AbsenceController extends Controller
     public function destroy(Request $request, Absence $absence)
     {
         $data = $request->validate([
-            'motif_suppression' => 'nullable|string',
+            'motif_suppression' => 'nullable|string|max:500',
         ]);
 
         if (isset($data['motif_suppression'])) {
@@ -130,7 +141,28 @@ class AbsenceController extends Controller
 
         $absence->delete();
 
+        // For Inertia requests, redirect back to manage page with current filters
+        if ($request->header('X-Inertia')) {
+            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
+            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence deleted successfully');
+        }
+
         return response()->json(['deleted' => true]);
+    }
+
+    public function restore(Request $request, $id)
+    {
+        $absence = Absence::withTrashed()->findOrFail($id);
+        $absence->restore();
+        $absence->update(['motif_suppression' => null]);
+
+        // For Inertia requests, redirect back to manage page with current filters
+        if ($request->header('X-Inertia')) {
+            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
+            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence restored successfully');
+        }
+
+        return response()->json(['restored' => true]);
     }
 
     public function filter(Request $request)
@@ -154,7 +186,7 @@ class AbsenceController extends Controller
 
     public function indexAdmin(Request $request)
     {
-        $query = Absence::with(['student.user', 'module'])->withTrashed();
+        $query = Absence::with(['student.user', 'module', 'student.option'])->withTrashed();
 
         if ($search = $request->get('search')) {
             $query->whereHas('student', function ($q) use ($search) {
@@ -168,6 +200,39 @@ class AbsenceController extends Controller
 
         if ($moduleId = $request->get('module_id')) {
             $query->where('module_id', $moduleId);
+        }
+
+        // Filter by status (Active = not deleted, Deleted = deleted)
+        if ($status = $request->get('status')) {
+            if ($status === 'Deleted') {
+                $query->onlyTrashed();
+            } else {
+                $query->whereNull('deleted_at');
+            }
+        } else {
+            // Default: show only active (not deleted)
+            $query->whereNull('deleted_at');
+        }
+
+        // Filter by speciality (by libelle)
+        if ($specialiteId = $request->get('specialite_id')) {
+            $query->whereHas('student.option.specialite', function ($q) use ($specialiteId) {
+                $q->where('id', $specialiteId);
+            });
+        }
+
+        // Filter by year (année dans la spécialité: 1, 2, ou 3)
+        if ($annee = $request->get('annee')) {
+            $query->whereHas('student.option.specialite', function ($q) use ($annee) {
+                $q->where('annee', $annee);
+            });
+        }
+
+        // Filter by option
+        if ($optionId = $request->get('option_id')) {
+            $query->whereHas('student', function ($q) use ($optionId) {
+                $q->where('option_id', $optionId);
+            });
         }
 
         $perPage = (int) $request->get('per_page', 15);

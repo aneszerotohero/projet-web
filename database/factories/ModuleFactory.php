@@ -17,16 +17,26 @@ class ModuleFactory extends Factory
     public function definition(): array
     {
         $modules = [
-            'Mathématiques', 'Physique', 'Chimie', 'Informatique', 'Algorithmique',
-            'Base de données', 'Réseaux', 'Systèmes d\'exploitation', 'Programmation',
-            'Électronique', 'Mécanique', 'Gestion de projet', 'Anglais', 'Français',
-            'Économie', 'Communication', 'Statistiques', 'Recherche opérationnelle'
+            'Mathématiques I', 'Mathématiques II', 'Mathématiques III',
+            'Physique I', 'Physique II',
+            'Algorithmique', 'Base de données I', 'Base de données avancées',
+            'Programmation I', 'Programmation avancée',
+            'Réseaux I', 'Réseaux avancés',
+            'Systèmes d\'exploitation I', 'Systèmes d\'exploitation avancés',
+            'Gestion de projet I', 'Management de projet',
+            'Anglais I', 'Anglais II', 'Anglais technique',
+            'Économie', 'Communication', 'Statistiques I', 'Statistiques II',
+            'Recherche opérationnelle', 'Sécurité informatique',
+            'Architecture des systèmes', 'Architecture logicielle',
+            'Intelligence artificielle', 'Cloud Computing', 'Big Data',
+            'Projet de fin d\'études I', 'Projet de fin d\'études II',
+            'Stage en entreprise', 'Innovation et entrepreneuriat',
+            'Éthique professionnelle', 'Droit informatique', 'Gestion d\'entreprise'
         ];
 
         return [
             'libelle' => fake()->randomElement($modules),
-            'semestre' => fake()->randomElement([1, 2]),
-            'coef' => fake()->randomFloat(2, 1, 5),
+            'semestre' => fake()->randomElement([1, 2, 3, 4, 5, 6]), // S1-S6 selon logique métier
         ];
     }
 
@@ -47,6 +57,46 @@ class ModuleFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'semestre' => 2,
+        ]);
+    }
+
+    /**
+     * Indicate that the module belongs to semester 3.
+     */
+    public function semester3(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'semestre' => 3,
+        ]);
+    }
+
+    /**
+     * Indicate that the module belongs to semester 4.
+     */
+    public function semester4(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'semestre' => 4,
+        ]);
+    }
+
+    /**
+     * Indicate that the module belongs to semester 5.
+     */
+    public function semester5(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'semestre' => 5,
+        ]);
+    }
+
+    /**
+     * Indicate that the module belongs to semester 6.
+     */
+    public function semester6(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'semestre' => 6,
         ]);
     }
 }

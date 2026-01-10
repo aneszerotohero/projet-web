@@ -118,6 +118,13 @@ class StudentDashboardController extends Controller
         $moyenneSem = $student->moyenneParSemestre((int) $sem);
         $moyennesParModule = $student->moyennesParModule((int) $sem);
 
+        // Ensure it's a list for JSON serialization if it's a collection or assoc array
+        if ($moyennesParModule instanceof \Illuminate\Support\Collection) {
+            $moyennesParModule = $moyennesParModule->values();
+        } else if (is_array($moyennesParModule)) {
+            $moyennesParModule = array_values($moyennesParModule);
+        }
+
         $payload = [
             'student' => $student,
             'semestre' => (int) $sem,
@@ -130,5 +137,33 @@ class StudentDashboardController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    public function notes()
+    {
+        return \Inertia\Inertia::render('Eleve/Notes');
+    }
+
+    public function absences()
+    {
+        return \Inertia\Inertia::render('Eleve/Absences');
+    }
+
+    public function requestCorrection(Request $request)
+    {
+        // Placeholder for correction logic
+        // $request->validate([...]);
+        // CorrectionRequest::create([...]);
+        
+        return redirect()->back()->with('success', 'Correction request submitted successfully.');
+    }
+
+    public function requestJustification(Request $request)
+    {
+        // Placeholder for justification logic
+        // $request->validate([...]);
+        // Justification::create([...]);
+
+        return redirect()->back()->with('success', 'Justification submitted successfully.');
     }
 }

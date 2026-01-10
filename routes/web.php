@@ -12,10 +12,14 @@ Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
 Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout'])->name('logout');
 
 // Student dashboard
-Route::middleware(['auth','auth.eleve','current.semester'])->group(function () {
-    Route::get('/eleve/dashboard', [\App\Http\Controllers\StudentDashboardController::class, 'index'])->name('eleve.dashboard');
-    Route::get('/eleve/absences', [\App\Http\Controllers\AbsenceController::class, 'index'])->name('eleve.absences');
-    Route::get('/eleve/notes', [\App\Http\Controllers\Eleve\NotesController::class, 'index'])->name('eleve.notes');
+Route::prefix('student')->middleware(['auth','auth.eleve','current.semester'])->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\StudentDashboardController::class, 'index'])->name('eleve.dashboard');
+    Route::get('/notes', [\App\Http\Controllers\StudentDashboardController::class, 'notes'])->name('eleve.notes');
+    Route::get('/absences', [\App\Http\Controllers\StudentDashboardController::class, 'absences'])->name('eleve.absences');
+    
+    // Mutations (Redirects)
+    Route::post('/notes/correction', [\App\Http\Controllers\StudentDashboardController::class, 'requestCorrection'])->name('eleve.notes.correction');
+    Route::post('/absences/request', [\App\Http\Controllers\StudentDashboardController::class, 'requestJustification'])->name('eleve.absences.request');
 });
 
 // Admin dashboard
@@ -32,11 +36,27 @@ Route::middleware(['auth','auth.admin'])->group(function () {
         $res = $resResp instanceof \Illuminate\Http\JsonResponse ? $resResp->getData(true) : $resResp;
         $stats = $noteController->stats();
         
+        // Get specialities and options for filters
+        $specialites = \App\Models\Specialite::with('options')->get();
+        $options = \App\Models\Option::all();
+        $specialitesByLibelle = $specialites->groupBy('libelle')->map(function ($group) {
+            return [
+                'libelle' => $group->first()->libelle,
+                'specialites' => $group->values()
+            ];
+        });
+        
         return \Inertia\Inertia::render('Admin/Notes', [
             'meta' => $meta,
             'res' => $res,
             'stats' => $stats,
-            'filters' => $request->only(['search', 'module_id', 'semester', 'coef_id']),
+            'filters' => $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id']),
+            'available_filters' => [
+                'specialites' => $specialites,
+                'specialites_by_libelle' => $specialitesByLibelle,
+                'options' => $options,
+                'years' => [1, 2, 3],
+            ],
         ]);
     })->name('admin.notes.manage');
 
@@ -46,17 +66,35 @@ Route::middleware(['auth','auth.admin'])->group(function () {
         $res = $resResp instanceof \Illuminate\Http\JsonResponse ? $resResp->getData(true) : $resResp;
         $stats = $absenceController->stats();
         $modules = \App\Models\Module::select('id','libelle')->get();
+        $students = \App\Models\Student::select('id','nom','prenom')->with('user:id,student_id,matricule')->get();
+        
+        // Get specialities and options for filters
+        $specialites = \App\Models\Specialite::with('options')->get();
+        $options = \App\Models\Option::all();
+        $specialitesByLibelle = $specialites->groupBy('libelle')->map(function ($group) {
+            return [
+                'libelle' => $group->first()->libelle,
+                'specialites' => $group->values()
+            ];
+        });
         
         return \Inertia\Inertia::render('Admin/Absences', [
             'res' => $res,
             'stats' => $stats,
             'modules' => $modules,
+            'students' => $students,
+            'filters' => $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id']) + ['status' => $request->get('status', 'Active')],
+            'available_filters' => [
+                'specialites' => $specialites,
+                'specialites_by_libelle' => $specialitesByLibelle,
+                'options' => $options,
+                'years' => [1, 2, 3],
+            ],
         ]);
     })->name('admin.absences.manage');
 
     // Notes & absences management
-    Route::get('/admin/notes', [\App\Http\Controllers\NoteController::class, 'index']);
-    Route::get('/admin/notes/meta', [\App\Http\Controllers\NoteController::class, 'meta']);
+    // NoteController modifier actions (Inertia redirects)
     Route::post('/admin/notes/single', [\App\Http\Controllers\NoteController::class, 'storeSingle']);
     Route::post('/admin/notes/bulk', [\App\Http\Controllers\NoteController::class, 'storeBulk']);
     Route::patch('/admin/notes/{note}', [\App\Http\Controllers\NoteController::class, 'update']);
@@ -66,5 +104,16 @@ Route::middleware(['auth','auth.admin'])->group(function () {
     Route::post('/admin/absences', [\App\Http\Controllers\AbsenceController::class, 'store']);
     Route::patch('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'update']);
     Route::delete('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'destroy']);
+    Route::post('/admin/absences/{id}/restore', [\App\Http\Controllers\AbsenceController::class, 'restore'])->name('admin.absences.restore');
     Route::get('/admin/absences/filter', [\App\Http\Controllers\AbsenceController::class, 'filter']);
+    
+    // Student transcript for admin
+    Route::get('/admin/students/{student}/transcript', [\App\Http\Controllers\AdminStudentTranscriptController::class, 'show'])->name('admin.students.transcript');
+    Route::get('/admin/students/{student}/transcript/export', [\App\Http\Controllers\AdminStudentTranscriptExportController::class, 'export'])->name('admin.students.transcript.export');
+    
+    // Dashboard export
+    Route::get('/admin/dashboard/export', [\App\Http\Controllers\AdminDashboardExportController::class, 'export'])->name('admin.dashboard.export');
+    
+    // Import CSV for notes
+    Route::post('/admin/notes/import', [\App\Http\Controllers\NoteController::class, 'importCsv'])->name('admin.notes.import');
 });

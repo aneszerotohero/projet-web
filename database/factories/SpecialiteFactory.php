@@ -11,9 +11,11 @@ class SpecialiteFactory extends Factory
 {
     public function definition(): array
     {
+        $libelles = ['Informatique', 'Électronique', 'Mécanique'];
+        
         return [
-            'libelle' => fake()->word(),
-            'annee' => date('Y'),
+            'libelle' => fake()->randomElement($libelles),
+            'annee' => fake()->randomElement([1, 2, 3]), // Année dans la spécialité (1, 2, ou 3)
         ];
     }
 }

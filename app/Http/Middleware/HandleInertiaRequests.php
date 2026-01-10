@@ -25,6 +25,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user() ? $request->user()->only(['id', 'matricule', 'role']) : null,
             ],
             'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
                 'message' => $request->session()->get('message'),
                 'errors' => $request->session()->get('errors') ? $request->session()->get('errors')->getBag('default')->getMessages() : new \stdClass(),
             ],

@@ -1,45 +1,175 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
+import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import {
     Download, Users, BarChart3, CheckCircle, AlertTriangle,
-    Search, Filter, ChevronDown, Trophy, Medal, Eye, Pencil,
-    ChevronLeft, ChevronRight, MoreHorizontal
+    Search, Filter, ChevronDown, Trophy, Eye, Pencil, X
 } from 'lucide-react';
 
-export default function AdminDashboard({ podium = [], others = [], ranking_stats = {}, filters = {} }) {
+export default function AdminDashboard({ 
+    podium = [], 
+    others = [], 
+    ranking_stats = {}, 
+    filters = {},
+    available_filters = {}
+}) {
     // Ensure safe defaults
     const safePodium = Array.isArray(podium) ? podium : [];
     const safeOthers = Array.isArray(others) ? others : [];
     const safeRankingStats = ranking_stats || {};
     const safeFilters = filters || {};
+    const safeAvailableFilters = available_filters || {};
+    
+    const specialitesByLibelle = safeAvailableFilters.specialites_by_libelle || {};
+    const specialites = safeAvailableFilters.specialites || [];
+    const options = safeAvailableFilters.options || [];
+    const years = safeAvailableFilters.years || [1, 2, 3];
+    const semesters = safeAvailableFilters.semesters || [];
+    
+    // Filter states
+    const [openDropdown, setOpenDropdown] = useState(null);
+    const [searchTerm, setSearchTerm] = useState(safeFilters.search || '');
+    const [searchTimeout, setSearchTimeout] = useState(null);
+    
+    // Current filter values
+    const currentYear = safeFilters.year || null;
+    const currentSpecialiteId = safeFilters.specialite_id || null;
+    const currentOptionId = safeFilters.option_id || null;
+    const currentSemester = safeFilters.semester || 'cycle';
+    
+    // Get filtered options based on selected specialite
+    const filteredOptions = currentSpecialiteId 
+        ? options.filter(opt => {
+            const specialite = safeAvailableFilters.specialites?.find(s => s.id == currentSpecialiteId);
+            return specialite && opt.specialite_id == currentSpecialiteId;
+        })
+        : options;
+    
+    // Handle filter changes
+    const applyFilters = useCallback((newFilters) => {
+        const params = {};
+        
+        // Year filter (independent - 1, 2, or 3)
+        if (newFilters.annee !== undefined && newFilters.annee !== null) {
+            params.annee = newFilters.annee;
+        }
+        
+        // Speciality filter (independent - by libelle only)
+        // When year is set, we auto-select the matching specialite for that year
+        if (newFilters.specialite_id !== undefined) {
+            if (newFilters.specialite_id === null) {
+                params.specialite_id = '';
+            } else {
+                params.specialite_id = newFilters.specialite_id;
+            }
+        }
+        
+        // Option filter (depends on specialite)
+        if (newFilters.option_id !== undefined) {
+            if (newFilters.option_id === null) {
+                params.option_id = '';
+            } else {
+                params.option_id = newFilters.option_id;
+            }
+        }
+        
+        // Semester filter
+        if (newFilters.semester !== undefined) {
+            params.semester = newFilters.semester;
+        }
+        
+        // Search filter
+        if (newFilters.search !== undefined) {
+            params.search = newFilters.search;
+        }
+        
+        router.get('/admin/dashboard', params, { 
+            preserveState: true, 
+            preserveScroll: true,
+            only: ['podium', 'others', 'ranking_stats', 'filters', 'available_filters']
+        });
+        setOpenDropdown(null);
+    }, []);
+    
+    // Handle search with debounce
+    const handleSearch = useCallback((value) => {
+        setSearchTerm(value);
+        
+        if (searchTimeout) clearTimeout(searchTimeout);
+        
+        const timeout = setTimeout(() => {
+            applyFilters({
+                annee: currentYear,
+                specialite_id: currentSpecialiteId,
+                option_id: currentOptionId,
+                semester: currentSemester,
+                search: value
+            });
+        }, 500);
+        
+        setSearchTimeout(timeout);
+    }, [currentYear, currentSpecialiteId, currentOptionId, currentSemester, searchTimeout, applyFilters]);
+    
+    // Reset all filters
+    const resetFilters = () => {
+        setSearchTerm('');
+        router.get('/admin/dashboard', {}, { preserveState: true });
+        setOpenDropdown(null);
+    };
+    
+    // Get display labels
+    const getYearLabel = () => {
+        if (!currentYear) return 'All';
+        return `Year ${currentYear}`;
+    };
+    
+    const getSpecialityLabel = () => {
+        if (!currentSpecialiteId) return 'All';
+        const spec = safeAvailableFilters.specialites?.find(s => s.id == currentSpecialiteId);
+        if (!spec) return 'All';
+        // Only libelle, no year
+        const label = spec.libelle;
+        return label.length > 25 ? label.substring(0, 22) + '...' : label;
+    };
+    
+    const getOptionLabel = () => {
+        if (!currentOptionId) return 'All';
+        const opt = options.find(o => o.id == currentOptionId);
+        if (!opt) return 'All';
+        // Truncate if too long
+        return opt.libelle.length > 25 ? opt.libelle.substring(0, 22) + '...' : opt.libelle;
+    };
+    
+    const getSemesterLabel = () => {
+        const sem = semesters.find(s => s.value == currentSemester || s.value == String(currentSemester));
+        if (!sem) return 'Cycle';
+        // Truncate if too long
+        const label = sem.label;
+        return label.length > 30 ? label.substring(0, 27) + '...' : label;
+    };
 
     const KpiCard = ({ title, value, trend, type, icon: Icon }) => (
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 relative overflow-hidden group hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start z-10">
                 <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">{title}</h3>
-                <div className={`p-2 rounded-lg ${type === 'up' || type === 'down_good' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
-                    }`}>
+                <div className={`p-2 rounded-lg ${type === 'up' || type === 'down_good' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
                     <Icon className="w-5 h-5" />
                 </div>
             </div>
             <div className="z-10">
                 <div className="flex items-baseline gap-3">
                     <h2 className="text-3xl font-black text-gray-900">{value}</h2>
-                   {trend && (
-                       <span
-                           className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                               (trend?.includes('+') && type !== 'down_good') || (trend?.includes('-') && type === 'down_good')
-                                   ? 'bg-green-100 text-green-800'
-                                   : 'bg-red-100 text-red-800'
-                           }`}
-                       >
-                           {trend}
-                       </span>
-                   )}
-
+                    {trend && (
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                            (trend?.includes('+') && type !== 'down_good') || (trend?.includes('-') && type === 'down_good')
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                        }`}>
+                            {trend}
+                        </span>
+                    )}
                 </div>
             </div>
-            {/* Background decoration */}
             <Icon className="absolute -bottom-4 -right-4 w-24 h-24 text-gray-50 opacity-10 transform -rotate-12 group-hover:scale-110 transition-transform" />
         </div>
     );
@@ -48,12 +178,16 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
         if (!student) return null;
         const prenom = student.prenom || '';
         const nom = student.nom || '';
-        const moyenne = student.moyenne_cycle || 0;
+        const moyenne = student.moyenne_cycle || student.moyenne_semestre || 0;
         const initials = (prenom[0] || '') + (nom[0] || '');
         
         return (
             <div className={`flex flex-col items-center flex-1 ${rank === 1 ? '-mt-12 scale-110 z-10' : 'mt-0'}`}>
-                <div className="relative mb-4 group cursor-pointer">
+                <div className="relative mb-4 group cursor-pointer" onClick={() => {
+                    const params = new URLSearchParams();
+                    if (currentSemester && currentSemester !== 'cycle') params.set('semester', currentSemester);
+                    window.location.href = `/admin/students/${student.id}/transcript?${params.toString()}`;
+                }}>
                     <div className={`w-24 h-24 rounded-full border-4 ${rank === 1 ? 'border-yellow-400 shadow-xl shadow-yellow-200' :
                             rank === 2 ? 'border-gray-300 shadow-lg' : 'border-orange-300 shadow-lg'
                         } overflow-hidden bg-gray-100`}>
@@ -75,7 +209,6 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                         {Number(moyenne).toFixed(2)} <span className="text-xs text-gray-400 font-medium">/ 20</span>
                     </div>
                 </div>
-                {/* Podium Block */}
                 <div className={`w-full rounded-t-xl shadow-inner flex justify-center items-start pt-4 font-black text-6xl text-white/20 select-none
                     ${rank === 1 ? 'h-64 bg-yellow-100/50' : rank === 2 ? 'h-48 bg-gray-100' : 'h-32 bg-orange-50'}`}>
                     {rank}
@@ -83,6 +216,26 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
             </div>
         );
     };
+
+    const Dropdown = ({ label, value, isOpen, onToggle, children }) => (
+        <div className="relative">
+            <button 
+                onClick={onToggle}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors whitespace-nowrap min-w-[120px]"
+            >
+                <span className="truncate max-w-[180px]">{label}: {value}</span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenDropdown(null)}></div>
+                    <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto z-[101]">
+                        {children}
+                    </div>
+                </>
+            )}
+        </div>
+    );
 
     return (
         <AdminLayout>
@@ -94,37 +247,172 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                             Dashboard • <span className="text-blue-600">Rankings</span>
                         </nav>
                         <h1 className="text-3xl font-black text-gray-900 tracking-tight">Student Rankings</h1>
-                        <p className="text-gray-500 mt-1 text-sm">Overview of academic performance for the 2023-2024 academic year.</p>
+                        <p className="text-gray-500 mt-1 text-sm">Overview of academic performance and rankings.</p>
                     </div>
-                    <button className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5">
+                    <button 
+                        onClick={() => {
+                            // Create export URL with current filters
+                            const params = new URLSearchParams();
+                            if (currentYear) params.set('annee', currentYear);
+                            if (currentSpecialiteId) params.set('specialite_id', currentSpecialiteId);
+                            if (currentOptionId) params.set('option_id', currentOptionId);
+                            if (currentSemester && currentSemester !== 'cycle') params.set('semester', currentSemester);
+                            if (searchTerm) params.set('search', searchTerm);
+                            
+                            // Direct download - export routes don't need Inertia
+                            window.location.href = `/admin/dashboard/export?${params.toString()}`;
+                        }}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"
+                    >
                         <Download className="w-5 h-5" />
                         Export Report
                     </button>
                 </div>
 
                 {/* Filters */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8 overflow-x-auto">
-                    <div className="flex flex-wrap items-center gap-4 md:gap-8 min-w-max">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Filters:</span>
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8">
+                    <div className="flex flex-wrap items-center gap-4 md:gap-6">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filters:</span>
 
-                            {/* Filter Dropdowns */}
-                            {[
-                                { label: 'Year', value: safeFilters.year || new Date().getFullYear().toString() },
-                                { label: 'Speciality', value: safeFilters.speciality || 'All' },
-                                { label: 'Option', value: safeFilters.option || 'All' },
-                                { label: 'Semester', value: safeFilters.semester ? `Semester ${safeFilters.semester}` : 'Semester 1' }
-                            ].map((filter, idx) => (
-                                <div key={idx} className="relative group">
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors">
-                                        {filter.label}: {filter.value}
-                                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                            {/* Year Dropdown */}
+                            <Dropdown
+                                label="Year"
+                                value={getYearLabel()}
+                                isOpen={openDropdown === 'year'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: null, specialite_id: currentSpecialiteId, option_id: currentOptionId, semester: currentSemester, search: searchTerm })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Years
                                     </button>
+                                    {years.map(year => (
+                                        <button
+                                            key={year}
+                                            onClick={() => applyFilters({ annee: year, specialite_id: currentSpecialiteId, option_id: currentOptionId, semester: currentSemester, search: searchTerm })}
+                                            className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentYear == year ? 'bg-blue-50 text-blue-600' : ''}`}
+                                        >
+                                            Year {year}
+                                        </button>
+                                    ))}
                                 </div>
-                            ))}
+                            </Dropdown>
+
+                            {/* Speciality Dropdown */}
+                            <Dropdown
+                                label="Speciality"
+                                value={getSpecialityLabel()}
+                                isOpen={openDropdown === 'speciality'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'speciality' ? null : 'speciality')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null, semester: currentSemester, search: searchTerm })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Specialities
+                                    </button>
+                                    {Object.keys(specialitesByLibelle).length > 0 ? (
+                                        Object.values(specialitesByLibelle).map((group) => {
+                                            if (!group || !group.libelle) return null;
+                                            // Get the first specialite with this libelle (or find one matching current year if set)
+                                            let selectedSpec = null;
+                                            if (currentYear && group.specialites) {
+                                                selectedSpec = group.specialites.find(s => s.annee == currentYear);
+                                            }
+                                            if (!selectedSpec && group.specialites && group.specialites.length > 0) {
+                                                selectedSpec = group.specialites[0]; // Use first one as default
+                                            }
+                                            
+                                            // Check if any specialite in this group is selected
+                                            const isSelected = selectedSpec && currentSpecialiteId == selectedSpec.id;
+                                            
+                                            return (
+                                                <button
+                                                    key={group.libelle}
+                                                    onClick={() => {
+                                                        // When clicking on a libelle, select the specialite matching current year, or first one
+                                                        const specToSelect = currentYear && group.specialites 
+                                                            ? group.specialites.find(s => s.annee == currentYear) || group.specialites[0]
+                                                            : group.specialites[0];
+                                                        if (specToSelect) {
+                                                            applyFilters({ annee: currentYear, specialite_id: specToSelect.id, option_id: null, semester: currentSemester, search: searchTerm });
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${isSelected ? 'bg-blue-50 text-blue-600' : ''}`}
+                                                >
+                                                    {group.libelle}
+                                                </button>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="px-4 py-2 text-sm text-gray-500">No specialities available</div>
+                                    )}
+                                </div>
+                            </Dropdown>
+
+                            {/* Option Dropdown */}
+                            <Dropdown
+                                label="Option"
+                                value={getOptionLabel()}
+                                isOpen={openDropdown === 'option'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'option' ? null : 'option')}
+                            >
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: null, semester: currentSemester, search: searchTerm })}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                    >
+                                        All Options
+                                    </button>
+                                    {filteredOptions.length > 0 ? (
+                                        filteredOptions.map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: opt.id, semester: currentSemester, search: searchTerm })}
+                                                className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentOptionId == opt.id ? 'bg-blue-50 text-blue-600' : ''}`}
+                                            >
+                                                {opt.libelle}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-2 text-sm text-gray-500">No options available</div>
+                                    )}
+                                </div>
+                            </Dropdown>
+
+                            {/* Semester Dropdown */}
+                            <Dropdown
+                                label="Semester"
+                                value={getSemesterLabel()}
+                                isOpen={openDropdown === 'semester'}
+                                onToggle={() => setOpenDropdown(openDropdown === 'semester' ? null : 'semester')}
+                            >
+                                <div className="p-2">
+                                    {semesters.length > 0 ? (
+                                        semesters.map((sem) => (
+                                            <button
+                                                key={sem.value}
+                                                onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: currentOptionId, semester: sem.value, search: searchTerm })}
+                                                className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${(currentSemester == sem.value || String(currentSemester) == String(sem.value)) ? 'bg-blue-50 text-blue-600' : ''}`}
+                                            >
+                                                {sem.label}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-2 text-sm text-gray-500">No semesters available</div>
+                                    )}
+                                </div>
+                            </Dropdown>
                         </div>
                         <div className="flex-1"></div>
-                        <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
+                        <button 
+                            onClick={resetFilters}
+                            className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                        >
                             Reset Filters
                         </button>
                     </div>
@@ -140,9 +428,7 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
 
                 {/* Podium Section */}
                 <div className="flex justify-center items-end gap-4 md:gap-12 mb-16 px-4 py-8 relative">
-                    {/* Crown Icon floating above 1st place */}
                     <Trophy className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-8 text-yellow-500 animate-bounce" />
-
                     {safePodium[1] && <PodiumStep student={safePodium[1]} rank={2} color="bg-gray-400" />}
                     {safePodium[0] && <PodiumStep student={safePodium[0]} rank={1} color="bg-yellow-400" />}
                     {safePodium[2] && <PodiumStep student={safePodium[2]} rank={3} color="bg-orange-400" />}
@@ -157,13 +443,12 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => handleSearch(e.target.value)}
                                     placeholder="Search student..."
                                     className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-100 transition-all"
                                 />
                             </div>
-                            <button className="p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                                <Filter className="w-5 h-5 text-gray-600" />
-                            </button>
                         </div>
                     </div>
 
@@ -181,14 +466,14 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {[...safePodium, ...safeOthers].filter(s => s && s.rank).sort((a, b) => (a.rank || 0) - (b.rank || 0)).slice(3).map((student) => {
+                                {[...safePodium, ...safeOthers].filter(s => s && s.rank).sort((a, b) => (a.rank || 0) - (b.rank || 0)).map((student) => {
                                     if (!student) return null;
                                     const prenom = student.prenom || '';
                                     const nom = student.nom || '';
                                     const matricule = student.matricule || 'N/A';
                                     const s1 = student.s1 || 0;
                                     const s2 = student.s2 || 0;
-                                    const moyenne_cycle = student.moyenne_cycle || 0;
+                                    const moyenne_cycle = student.moyenne_cycle || student.moyenne_semestre || 0;
                                     const initials = (prenom[0] || '') + (nom[0] || '');
                                     const rank = student.rank || 0;
                                     
@@ -213,11 +498,16 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                    <button 
+                                                        onClick={() => {
+                                                            const params = new URLSearchParams();
+                                                            if (currentSemester && currentSemester !== 'cycle') params.set('semester', currentSemester);
+                                                            window.location.href = `/admin/students/${student.id}/transcript?${params.toString()}`;
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="View Transcript"
+                                                    >
                                                         <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    <button className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
-                                                        <Pencil className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -226,18 +516,6 @@ export default function AdminDashboard({ podium = [], others = [], ranking_stats
                                 })}
                             </tbody>
                         </table>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="p-4 border-t border-gray-50 flex justify-between items-center text-sm">
-                        <span className="text-gray-500 font-medium">
-                            Showing <span className="font-bold text-gray-900">4</span> to <span className="font-bold text-gray-900">{Math.min(4 + safeOthers.length, safePodium.length + safeOthers.length)}</span> of <span className="font-bold text-gray-900">{safePodium.length + safeOthers.length}</span> students
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50" disabled><ChevronLeft className="w-4 h-4" /></button>
-                            <button className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/30">1</button>
-                            <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50" disabled><ChevronRight className="w-4 h-4" /></button>
-                        </div>
                     </div>
                 </div>
             </div>
