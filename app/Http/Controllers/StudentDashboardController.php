@@ -155,7 +155,7 @@ class StudentDashboardController extends Controller
         // $request->validate([...]);
         // CorrectionRequest::create([...]);
         
-        return redirect()->back()->with('success', 'Correction request submitted successfully.');
+        return response()->noContent();
     }
 
     public function requestJustification(Request $request)
@@ -164,6 +164,6 @@ class StudentDashboardController extends Controller
         // $request->validate([...]);
         // Justification::create([...]);
 
-        return redirect()->back()->with('success', 'Justification submitted successfully.');
+        return response()->noContent();
     }
 }

@@ -23,8 +23,7 @@ class NoteController extends Controller
             ['note' => $data['note']]
         );
 
-        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
-        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note created successfully');
+        return response()->noContent();
     }
 
     // bulk creation: array of notes
@@ -47,7 +46,7 @@ class NoteController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Notes imported successfully');
+        return response()->noContent();
     }
 
     public function index(Request $request)
@@ -126,17 +125,15 @@ class NoteController extends Controller
         ]);
 
         $note->update($data);
-
-        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
-        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note updated successfully');
+// On redirige explicitement vers la route de gestion
+         return redirect()->route('admin.notes.manage')->with('success', 'Action effectuée avec succès');
     }
 
     public function destroy(Request $request, Note $note)
     {
         $note->delete();
         
-        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
-        return redirect()->route('admin.notes.manage', $filters)->with('success', 'Note deleted successfully');
+        return response()->noContent();
     }
 
     public function stats()
@@ -244,14 +241,6 @@ class NoteController extends Controller
             }
         });
 
-        $filters = $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id', 'page']);
-        $message = "Imported {$imported} notes successfully";
-        if (count($errors) > 0) {
-            $message .= " with " . count($errors) . " errors";
-        }
-        
-        return redirect()->route('admin.notes.manage', $filters)
-            ->with('success', $message)
-            ->with('import_errors', $errors);
+        return response()->noContent();
     }
 }

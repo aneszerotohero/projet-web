@@ -228,25 +228,26 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
         setShowModal(true);
     };
 
-    // Handle form submit
     const handleSubmit = (e) => {
+        // 1. Bloquer TOUT comportement par défaut
         e.preventDefault();
+        e.stopPropagation();
+    
         setErrors({});
-
-        // Force strictly clean URLs for PATCH/POST
-        const url = editingNote ? `/admin/notes/${editingNote.id}` : '/admin/notes/single';
-        const method = editingNote ? 'patch' : 'post';
-
-        // Ensure formData only contains body fields, not ID
-        const payload = { ...formData };
-        if (editingNote) {
-            // For safety, ensure we aren't passing ID in body (though handled by route)
-        }
-
-        router[method](url, payload, {
-            preserveState: true,
+    
+        // DEBUG : On vérifie ce qui est calculé JUSTE avant l'appel
+        const isEdit = editingNote && editingNote.id;
+        const targetUrl = isEdit ? `/admin/notes/${editingNote.id}` : '/admin/notes/single';
+        
+        console.log("--- LOG DE DÉBOGAGE ---");
+        console.log("Mode:", isEdit ? "ÉDITION" : "CRÉATION");
+        console.log("URL Cible:", targetUrl);
+        console.log("Payload:", formData);
+    
+        const options = {
             preserveScroll: true,
-            onSuccess: (page) => {
+            onSuccess: () => {
+                console.log("Succès Inertia !");
                 setShowModal(false);
                 setEditingNote(null);
                 setFormData({ student_id: '', module_id: '', coef_id: '', note: '' });
@@ -255,20 +256,37 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                 setShowStudentResults(false);
             },
             onError: (errs) => {
+                console.error("Erreurs Inertia:", errs);
                 setErrors(errs);
+                if (errs?.message?.includes('419')) window.location.reload();
             }
-        });
+        };
+    
+        // 2. Exécution des appels
+        if (isEdit) {
+            // On utilise l'URL en dur calculée au-dessus
+            router.patch(targetUrl, formData, options);
+        } else {
+            router.post('/admin/notes/single', formData, options);
+        }
     };
-
     // Handle delete
     const handleDelete = (noteId) => {
-        if (!window.confirm('Are you sure you want to delete this note?')) return;
+        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette note ?')) return;
 
         router.delete(`/admin/notes/${noteId}`, {
             preserveState: true,
             preserveScroll: true,
+            onSuccess: () => {
+                // No need to reload - the redirect from server will handle it
+            },
             onError: (errs) => {
-                alert('Error deleting note: ' + (errs.message || 'Unknown error'));
+                // If CSRF error, reload the page to get a new token
+                if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
+                    window.location.reload();
+                } else {
+                    alert('Erreur lors de la suppression: ' + (errs.message || 'Erreur inconnue'));
+                }
             }
         });
     };
@@ -402,11 +420,15 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         formData.append('file', file);
                                         router.post('/admin/notes/import', formData, {
                                             forceFormData: true,
+                                            preserveScroll: true,
                                             onSuccess: () => {
-                                                // Success, automatic reload handled by Inertia
+                                                router.reload({ only: ['res', 'stats'], preserveScroll: true });
                                             },
                                             onError: (errors) => {
                                                 console.error('Import errors:', errors);
+                                                if (errors.message && (errors.message.includes('419') || errors.message.includes('CSRF'))) {
+                                                    window.location.reload();
+                                                }
                                             }
                                         });
                                     }

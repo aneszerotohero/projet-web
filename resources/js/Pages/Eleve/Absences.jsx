@@ -106,7 +106,17 @@ export default function StudentAbsences() {
     const handleRequestJustification = (absenceId) => {
         if (confirm('Submit a justification request for this absence?')) {
             router.post('/student/absences/request', { absence_id: absenceId }, {
-                onSuccess: () => alert('Justification request submitted.')
+                preserveScroll: true,
+                onSuccess: () => {
+                    fetchAbsences(filters, pagination.current_page);
+                },
+                onError: (errs) => {
+                    if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
+                        window.location.reload();
+                    } else {
+                        alert('Error submitting request: ' + (errs.message || 'Unknown error'));
+                    }
+                }
             });
         }
     };

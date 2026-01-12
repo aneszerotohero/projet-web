@@ -24,8 +24,8 @@ export default function StudentLayout({ children }) {
                             </div>
                             <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
                                 <Link
-                                    href="/eleve/dashboard"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/eleve/dashboard')
+                                    href="/student/dashboard"
+                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/student/dashboard')
                                             ? 'border-blue-500 text-gray-900'
                                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                                         }`}
@@ -34,8 +34,8 @@ export default function StudentLayout({ children }) {
                                     Tableau de bord
                                 </Link>
                                 <Link
-                                    href="/eleve/notes"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/eleve/notes')
+                                    href="/student/notes"
+                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/student/notes')
                                             ? 'border-blue-500 text-gray-900'
                                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                                         }`}
@@ -44,8 +44,8 @@ export default function StudentLayout({ children }) {
                                     Relevé de notes
                                 </Link>
                                 <Link
-                                    href="/eleve/absences"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/eleve/absences')
+                                    href="/student/absences"
+                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/student/absences')
                                             ? 'border-blue-500 text-gray-900'
                                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                                         }`}

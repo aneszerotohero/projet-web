@@ -6,47 +6,62 @@ import {
     AlertTriangle, XCircle, Calendar, FileText
 } from 'lucide-react';
 
-export default function StudentTranscript({ student, notes = [], moyennes = {}, selected_semester = null }) {
+export default function StudentTranscript({ student, notes = [], notes_by_module = [], moyennes = {}, selected_semester = null, general_average = 0 }) {
     const [semesterFilter, setSemesterFilter] = useState(selected_semester || 'all');
 
-    // Filter notes by semester
-    const filteredNotes = semesterFilter === 'all'
-        ? notes
-        : notes.filter(note => note.module?.semestre == semesterFilter);
-
-    // Group notes by module
-    const notesByModule = filteredNotes.reduce((acc, note) => {
-        const moduleId = note.module_id;
-        if (!acc[moduleId]) {
-            acc[moduleId] = {
-                module: note.module,
-                notes: []
-            };
-        }
-        acc[moduleId].notes.push(note);
-        return acc;
-    }, {});
-
-    // Calculate module averages
-    const moduleAverages = Object.values(notesByModule).map(({ module, notes }) => {
-        let sum = 0;
-        let totalWeight = 0;
-        notes.forEach(note => {
-            const weight = note.coef?.coef || 1;
-            sum += note.note * weight;
-            totalWeight += weight;
-        });
-        return {
+    // Use pre-grouped data from backend if available, otherwise fallback to frontend grouping
+    const moduleAverages = notes_by_module && notes_by_module.length > 0
+        ? notes_by_module.map(({ module, notes: moduleNotes, average, notes_count }) => ({
             module,
-            average: totalWeight > 0 ? sum / totalWeight : 0,
-            notes
-        };
-    });
+            average,
+            notes: moduleNotes,
+            notes_count
+        }))
+        : (() => {
+            // Fallback: Group notes by module in frontend (backward compatibility)
+            const filteredNotes = semesterFilter === 'all'
+                ? notes
+                : notes.filter(note => note.module?.semestre == semesterFilter);
 
-    // Calculate general average for filtered semester
-    const generalAverage = moduleAverages.length > 0
-        ? moduleAverages.reduce((sum, m) => sum + m.average, 0) / moduleAverages.length
-        : 0;
+            const notesByModule = filteredNotes.reduce((acc, note) => {
+                const moduleId = note.module_id;
+                if (!acc[moduleId]) {
+                    acc[moduleId] = {
+                        module: note.module,
+                        notes: []
+                    };
+                }
+                acc[moduleId].notes.push(note);
+                return acc;
+            }, {});
+
+            return Object.values(notesByModule).map(({ module, notes: moduleNotes }) => {
+                let sum = 0;
+                let totalWeight = 0;
+                moduleNotes.forEach(note => {
+                    const weight = note.coef?.coef || 1;
+                    sum += note.note * weight;
+                    totalWeight += weight;
+                });
+                return {
+                    module,
+                    average: totalWeight > 0 ? sum / totalWeight : 0,
+                    notes: moduleNotes
+                };
+            });
+        })();
+
+    // Use backend-calculated general average if available, otherwise calculate
+    const generalAverage = general_average > 0
+        ? general_average
+        : (moduleAverages.length > 0
+            ? moduleAverages.reduce((sum, m) => sum + m.average, 0) / moduleAverages.length
+            : 0);
+
+    // Get filtered notes count for display
+    const filteredNotes = notes_by_module && notes_by_module.length > 0
+        ? notes_by_module.reduce((sum, m) => sum + (m.notes?.length || 0), 0)
+        : notes.length;
 
     // Get semester label
     const getSemesterLabel = (sem) => {
@@ -176,7 +191,7 @@ export default function StudentTranscript({ student, notes = [], moyennes = {}, 
                             <FileText className="w-5 h-5 text-green-500" />
                         </div>
                         <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-3xl font-black text-gray-900">{filteredNotes.length}</span>
+                            <span className="text-3xl font-black text-gray-900">{filteredNotes}</span>
                         </div>
                         <p className="text-sm text-gray-900 font-bold mt-2">Grades recorded</p>
                     </div>
@@ -276,7 +291,7 @@ export default function StudentTranscript({ student, notes = [], moyennes = {}, 
                     <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                         <h2 className="font-bold text-gray-900 text-lg">Detailed Transcript</h2>
                         <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">
-                            {moduleAverages.length} Modules / {filteredNotes.length} Grades
+                            {moduleAverages.length} Modules / {filteredNotes} Grades
                         </span>
                     </div>
 

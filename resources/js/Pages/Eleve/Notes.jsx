@@ -177,7 +177,7 @@ export default function StudentNotes() {
                                 <th className="px-6 py-4">Type</th>
                                 <th className="px-6 py-4">Grade</th>
                                 <th className="px-6 py-4">Coef</th>
-                                <th className="px-6 py-4">Actions</th>
+                                {/* <th className="px-6 py-4">Actions</th> */}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -215,18 +215,31 @@ export default function StudentNotes() {
                                         <td className="px-6 py-4 text-gray-600 font-medium">
                                             {note.coef?.coef || 1}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        {/* <td className="px-6 py-4">
                                             <button
                                                 onClick={() => {
                                                     if (confirm('Request correction for this grade?')) {
-                                                        router.post('/student/notes/correction', { note_id: note.id });
+                                                        router.post('/student/notes/correction', { note_id: note.id }, {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => {
+                                                                // Optionally show success message or reload data
+                                                                fetchNotes(filters, pagination.current_page);
+                                                            },
+                                                            onError: (errs) => {
+                                                                if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
+                                                                    window.location.reload();
+                                                                } else {
+                                                                    alert('Error submitting request: ' + (errs.message || 'Unknown error'));
+                                                                }
+                                                            }
+                                                        });
                                                     }
                                                 }}
                                                 className="text-xs font-bold text-blue-600 hover:text-blue-800"
                                             >
                                                 Request Correction
                                             </button>
-                                        </td>
+                                        </td> */}
                                     </tr>
                                 ))
                             )}

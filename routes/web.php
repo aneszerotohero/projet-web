@@ -17,48 +17,39 @@ Route::prefix('student')->middleware(['auth','auth.eleve','current.semester'])->
     Route::get('/notes', [\App\Http\Controllers\StudentDashboardController::class, 'notes'])->name('eleve.notes');
     Route::get('/absences', [\App\Http\Controllers\StudentDashboardController::class, 'absences'])->name('eleve.absences');
     
-    // Mutations (Redirects)
+    // Student mutations
     Route::post('/notes/correction', [\App\Http\Controllers\StudentDashboardController::class, 'requestCorrection'])->name('eleve.notes.correction');
     Route::post('/absences/request', [\App\Http\Controllers\StudentDashboardController::class, 'requestJustification'])->name('eleve.absences.request');
 });
+  // Notes & absences management
+  Route::post('/admin/notes/single', [\App\Http\Controllers\NoteController::class, 'storeSingle']);
+  Route::post('/admin/notes/bulk', [\App\Http\Controllers\NoteController::class, 'storeBulk']);
+  Route::patch('/admin/notes/{note}', [\App\Http\Controllers\NoteController::class, 'update']);
+  Route::delete('/admin/notes/{note}', [\App\Http\Controllers\NoteController::class, 'destroy']);
 
+  Route::get('/admin/absences', [\App\Http\Controllers\AbsenceController::class, 'indexAdmin']);
+  Route::post('/admin/absences', [\App\Http\Controllers\AbsenceController::class, 'store']);
+  Route::patch('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'update']);
+  Route::delete('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'destroy']);
+  Route::post('/admin/absences/{id}/restore', [\App\Http\Controllers\AbsenceController::class, 'restore'])->name('admin.absences.restore');
+  Route::get('/admin/absences/filter', [\App\Http\Controllers\AbsenceController::class, 'filter']);
+  
+ 
 // Admin dashboard
 Route::middleware(['auth','auth.admin'])->group(function () {
+   
     Route::get('/admin/dashboard', [\App\Http\Controllers\AdminDashboardController::class, 'index'])->name('admin.dashboard');
     // Admin SPA pages
-    Route::get('/admin/notes/manage', function (\Illuminate\Http\Request $request) {
-        $noteController = app(\App\Http\Controllers\NoteController::class);
-        $metaResp = $noteController->meta();
-        $meta = $metaResp instanceof \Illuminate\Http\JsonResponse ? $metaResp->getData(true) : $metaResp;
-        
-        // Pass filters to index method
-        $resResp = $noteController->index($request);
-        $res = $resResp instanceof \Illuminate\Http\JsonResponse ? $resResp->getData(true) : $resResp;
-        $stats = $noteController->stats();
-        
-        // Get specialities and options for filters
-        $specialites = \App\Models\Specialite::with('options')->get();
-        $options = \App\Models\Option::all();
-        $specialitesByLibelle = $specialites->groupBy('libelle')->map(function ($group) {
-            return [
-                'libelle' => $group->first()->libelle,
-                'specialites' => $group->values()
-            ];
-        });
-        
-        return \Inertia\Inertia::render('Admin/Notes', [
-            'meta' => $meta,
-            'res' => $res,
-            'stats' => $stats,
-            'filters' => $request->only(['search', 'module_id', 'semester', 'coef_id', 'annee', 'specialite_id', 'option_id']),
-            'available_filters' => [
-                'specialites' => $specialites,
-                'specialites_by_libelle' => $specialitesByLibelle,
-                'options' => $options,
-                'years' => [1, 2, 3],
-            ],
-        ]);
-    })->name('admin.notes.manage');
+   // Dans web.php, remplace temporairement le bloc Route::get('/admin/notes/manage', ...) par :
+Route::get('/admin/notes/manage', function () {
+    return \Inertia\Inertia::render('Admin/Notes', [
+        'meta' => [],
+        'res' => [],
+        'stats' => [],
+        'filters' => [],
+        'available_filters' => [],
+    ]);
+})->name('admin.notes.manage');
 
     Route::get('/admin/absences/manage', function (\Illuminate\Http\Request $request) {
         $absenceController = app(\App\Http\Controllers\AbsenceController::class);
@@ -93,20 +84,7 @@ Route::middleware(['auth','auth.admin'])->group(function () {
         ]);
     })->name('admin.absences.manage');
 
-    // Notes & absences management
-    // NoteController modifier actions (Inertia redirects)
-    Route::post('/admin/notes/single', [\App\Http\Controllers\NoteController::class, 'storeSingle']);
-    Route::post('/admin/notes/bulk', [\App\Http\Controllers\NoteController::class, 'storeBulk']);
-    Route::patch('/admin/notes/{note}', [\App\Http\Controllers\NoteController::class, 'update']);
-    Route::delete('/admin/notes/{note}', [\App\Http\Controllers\NoteController::class, 'destroy']);
-
-    Route::get('/admin/absences', [\App\Http\Controllers\AbsenceController::class, 'indexAdmin']);
-    Route::post('/admin/absences', [\App\Http\Controllers\AbsenceController::class, 'store']);
-    Route::patch('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'update']);
-    Route::delete('/admin/absences/{absence}', [\App\Http\Controllers\AbsenceController::class, 'destroy']);
-    Route::post('/admin/absences/{id}/restore', [\App\Http\Controllers\AbsenceController::class, 'restore'])->name('admin.absences.restore');
-    Route::get('/admin/absences/filter', [\App\Http\Controllers\AbsenceController::class, 'filter']);
-    
+  
     // Student transcript for admin
     Route::get('/admin/students/{student}/transcript', [\App\Http\Controllers\AdminStudentTranscriptController::class, 'show'])->name('admin.students.transcript');
     Route::get('/admin/students/{student}/transcript/export', [\App\Http\Controllers\AdminStudentTranscriptExportController::class, 'export'])->name('admin.students.transcript.export');

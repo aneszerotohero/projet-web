@@ -99,14 +99,9 @@ class AbsenceController extends Controller
             'justifie' => 'sometimes|boolean',
         ]);
 
-        $absence = Absence::create($data);
+        Absence::create($data);
 
-        // For Inertia requests, redirect back to manage page
-        if ($request->header('X-Inertia')) {
-            return redirect()->route('admin.absences.manage')->with('success', 'Absence recorded successfully');
-        }
-
-        return response()->json($absence);
+        return response()->noContent();
     }
 
     public function update(Request $request, Absence $absence)
@@ -120,13 +115,7 @@ class AbsenceController extends Controller
 
         $absence->update($data);
 
-        // For Inertia requests, redirect back to manage page with current filters
-        if ($request->header('X-Inertia')) {
-            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
-            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence updated successfully');
-        }
-
-        return response()->json($absence);
+        return response()->noContent();
     }
 
     public function destroy(Request $request, Absence $absence)
@@ -141,13 +130,7 @@ class AbsenceController extends Controller
 
         $absence->delete();
 
-        // For Inertia requests, redirect back to manage page with current filters
-        if ($request->header('X-Inertia')) {
-            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
-            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence deleted successfully');
-        }
-
-        return response()->json(['deleted' => true]);
+        return response()->noContent();
     }
 
     public function restore(Request $request, $id)
@@ -156,13 +139,7 @@ class AbsenceController extends Controller
         $absence->restore();
         $absence->update(['motif_suppression' => null]);
 
-        // For Inertia requests, redirect back to manage page with current filters
-        if ($request->header('X-Inertia')) {
-            $filters = $request->only(['search', 'module_id', 'status', 'annee', 'specialite_id', 'option_id', 'page']);
-            return redirect()->route('admin.absences.manage', $filters)->with('success', 'Absence restored successfully');
-        }
-
-        return response()->json(['restored' => true]);
+        return response()->noContent();
     }
 
     public function filter(Request $request)

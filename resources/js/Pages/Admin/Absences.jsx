@@ -135,7 +135,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         
         const timeout = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/admin/students/search?q=${encodeURIComponent(value)}`, {
+                const response = await fetch(`/api/students/search?q=${encodeURIComponent(value)}`, {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json',
@@ -163,7 +163,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         
         // Load modules for this student
         try {
-            const response = await fetch(`/api/admin/students/${student.id}/modules`, {
+            const response = await fetch(`/api/students/${student.id}/modules`, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
@@ -249,21 +249,17 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         
         router[method](url, formData, {
             preserveScroll: true,
-            onSuccess: (page) => {
+            onSuccess: () => {
                 setShowModal(false);
                 setEditingAbsence(null);
                 setFormData({ student_id: '', module_id: '', date_absence: '', motif_absence: '', justifie: false });
                 setStudentSearch('');
                 setStudentSearchResults([]);
                 setShowStudentResults(false);
-                // Reload only if we're not already on the manage page
-                if (!page.url.includes('/admin/absences/manage')) {
-                    router.reload({ only: ['res', 'stats'], preserveScroll: true });
-                }
+                router.reload({ only: ['res', 'stats'], preserveScroll: true });
             },
             onError: (errs) => {
                 setErrors(errs);
-                // If CSRF error, reload the page to get a new token
                 if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
                     window.location.reload();
                 }
@@ -307,14 +303,12 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         if (!window.confirm('Are you sure you want to restore this absence?')) return;
         
         router.post(`/admin/absences/${absence.id}/restore`, {}, {
-            preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
-                router.reload({ only: ['res', 'stats'], preserveState: true, preserveScroll: true });
+                router.reload({ only: ['res', 'stats'], preserveScroll: true });
             },
             onError: (errs) => {
-                // If CSRF error, reload the page to get a new token
-                if (errs.message && errs.message.includes('419') || errs.message && errs.message.includes('CSRF')) {
+                if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
                     window.location.reload();
                 } else {
                     alert('Error restoring absence: ' + (errs.message || 'Unknown error'));

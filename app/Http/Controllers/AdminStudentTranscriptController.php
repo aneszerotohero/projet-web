@@ -21,9 +21,32 @@ class AdminStudentTranscriptController extends Controller
                 $q->where('semestre', $semester);
             });
         }
-        $notes = $notes->orderBy('created_at', 'desc')->get();
+        $notes = $notes->orderBy('module_id')->orderBy('created_at', 'desc')->get();
         
-        // Get modules for the student
+        // Group notes by module and calculate module averages
+        $notesByModule = $notes->groupBy('module_id')->map(function ($moduleNotes, $moduleId) {
+            $module = $moduleNotes->first()->module;
+            $sum = 0;
+            $totalWeight = 0;
+            
+            foreach ($moduleNotes as $note) {
+                $weight = $note->coef->coef ?? 1;
+                $sum += $note->note * $weight;
+                $totalWeight += $weight;
+            }
+            
+            $average = $totalWeight > 0 ? $sum / $totalWeight : 0;
+            
+            return [
+                'module' => $module,
+                'notes' => $moduleNotes->values()->all(),
+                'average' => round($average, 2),
+                'total_weight' => $totalWeight,
+                'notes_count' => $moduleNotes->count(),
+            ];
+        })->values();
+        
+        // Get modules for the student (for filter dropdown)
         $modules = \App\Models\Module::whereHas('notes', function($q) use ($student) {
             $q->where('student_id', $student->id);
         })->get();
@@ -37,12 +60,19 @@ class AdminStudentTranscriptController extends Controller
             }
         }
         
+        // Calculate general average for filtered semester
+        $generalAverage = $notesByModule->count() > 0
+            ? $notesByModule->sum('average') / $notesByModule->count()
+            : 0;
+        
         $payload = [
             'student' => $student,
-            'notes' => $notes,
+            'notes' => $notes, // Keep flat list for backward compatibility if needed
+            'notes_by_module' => $notesByModule, // New: Pre-grouped data
             'moyennes' => $moyennes,
             'selected_semester' => $semester,
             'modules' => $modules,
+            'general_average' => round($generalAverage, 2),
         ];
         
         if (class_exists(\Inertia\Inertia::class)) {
