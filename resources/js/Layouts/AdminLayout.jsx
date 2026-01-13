@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutDashboard, Users, FileBarChart, Bell, Search, LogOut, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileBarChart, Bell, BarChart3, Search, LogOut, Menu, X } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
     const { url } = usePage();
@@ -52,19 +52,13 @@ export default function AdminLayout({ children }) {
                     {/* Nav Links - Scrollable Area */}
                     <div className="flex-1 overflow-y-auto py-5">
                         <div className="px-4 space-y-1">
-                            <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Tableau de bord" />
-
                             <div className="pt-4 pb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                 Gestion Scolaire
                             </div>
+                            <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Tableau de bord" />
                             <NavItem href="/admin/notes/manage" icon={FileBarChart} label="Gestion des Notes" />
                             <NavItem href="/admin/absences/manage" icon={Bell} label="Gestion des Absences" />
-
-                            <div className="pt-4 pb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                Système
-                            </div>
-                            <NavItem href="/admin/users" icon={Users} label="Utilisateurs" />
-                            <NavItem href="/admin/settings" icon={Settings} label="Paramètres" />
+                            <NavItem href="/admin/statistiques" icon={BarChart3} label="Statistiques" />
                         </div>
                     </div>
 

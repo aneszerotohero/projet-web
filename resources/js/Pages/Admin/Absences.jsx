@@ -8,7 +8,7 @@ import {
 
 export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], students = [], filters: initialFilters = {}, available_filters = {} }) {
     const { flash } = usePage().props;
-    
+
     // Safe defaults
     const safeRes = res || {};
     const safeStats = stats || {};
@@ -20,7 +20,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const specialites = safeAvailableFilters.specialites || [];
     const options = safeAvailableFilters.options || [];
     const years = safeAvailableFilters.years || [1, 2, 3];
-    
+
     // Format absences for display
     const formattedAbsences = absences.map(absence => {
         const student = absence.student || {};
@@ -28,8 +28,9 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         const module = absence.module || {};
         const dateAbsence = absence.date_absence ? new Date(absence.date_absence) : new Date();
         const isDeleted = absence.deleted_at !== null;
-        const status = isDeleted ? 'Deleted' : (absence.justifie ? 'Justified' : 'Unjustified');
-        
+        const statusKey = isDeleted ? 'deleted' : (absence.justifie ? 'justified' : 'unjustified');
+        const statusLabel = isDeleted ? 'Supprimé' : (absence.justifie ? 'Justifié' : 'Non justifié');
+
         return {
             id: absence.id,
             student_id: student.id,
@@ -41,10 +42,11 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
             },
             class: student.option?.libelle || 'N/A',
             module: module.libelle || 'N/A',
-            date: dateAbsence.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            time: dateAbsence.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            date: dateAbsence.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: dateAbsence.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
             date_absence: absence.date_absence,
-            status: status,
+            statusKey: statusKey,
+            statusLabel: statusLabel,
             isDeleted: isDeleted,
             justifie: absence.justifie || false,
             motif: absence.motif_absence || '',
@@ -58,9 +60,9 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const currentYear = filters.annee || null;
     const currentSpecialiteId = filters.specialite_id || null;
     const currentOptionId = filters.option_id || null;
-    
+
     // Get filtered options based on selected specialite
-    const filteredOptions = currentSpecialiteId 
+    const filteredOptions = currentSpecialiteId
         ? options.filter(opt => {
             const specialite = specialites.find(s => s.id == currentSpecialiteId);
             return specialite && opt.specialite_id == currentSpecialiteId;
@@ -68,12 +70,12 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         : options;
     const [showModal, setShowModal] = useState(false);
     const [editingAbsence, setEditingAbsence] = useState(null);
-    const [formData, setFormData] = useState({ 
-        student_id: '', 
-        module_id: '', 
-        date_absence: '', 
-        motif_absence: '', 
-        justifie: false 
+    const [formData, setFormData] = useState({
+        student_id: '',
+        module_id: '',
+        date_absence: '',
+        motif_absence: '',
+        justifie: false
     });
     const [errors, setErrors] = useState({});
     const [deleteModal, setDeleteModal] = useState(null);
@@ -87,7 +89,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const handleFilterChange = useCallback((key, value) => {
         const newFilters = { ...filters, [key]: value };
         setFilters(newFilters);
-        
+
         const params = {};
         if (newFilters.search) params.search = newFilters.search;
         if (newFilters.module_id) params.module_id = newFilters.module_id;
@@ -95,7 +97,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         if (newFilters.annee) params.annee = newFilters.annee;
         if (newFilters.specialite_id) params.specialite_id = newFilters.specialite_id;
         if (newFilters.option_id) params.option_id = newFilters.option_id;
-        
+
         router.get('/admin/absences/manage', params, { preserveState: true, preserveScroll: true });
     }, [filters]);
 
@@ -104,9 +106,9 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const handleSearch = useCallback((value) => {
         const newFilters = { ...filters, search: value };
         setFilters(newFilters);
-        
+
         if (searchTimeout) clearTimeout(searchTimeout);
-        
+
         const timeout = setTimeout(() => {
             const params = {};
             if (newFilters.search) params.search = newFilters.search;
@@ -117,7 +119,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
             if (newFilters.option_id) params.option_id = newFilters.option_id;
             router.get('/admin/absences/manage', params, { preserveState: true, preserveScroll: true });
         }, 500);
-        
+
         setSearchTimeout(timeout);
     }, [filters, searchTimeout]);
 
@@ -125,14 +127,14 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const handleStudentSearch = useCallback((value) => {
         setStudentSearch(value);
         setShowStudentResults(value.length >= 2);
-        
+
         if (studentSearchTimeout) clearTimeout(studentSearchTimeout);
-        
+
         if (value.length < 2) {
             setStudentSearchResults([]);
             return;
         }
-        
+
         const timeout = setTimeout(async () => {
             try {
                 const response = await fetch(`/api/students/search?q=${encodeURIComponent(value)}`, {
@@ -151,7 +153,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 setStudentSearchResults([]);
             }
         }, 300);
-        
+
         setStudentSearchTimeout(timeout);
     }, [studentSearchTimeout]);
 
@@ -160,7 +162,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         setFormData({ ...formData, student_id: student.id, module_id: '' }); // Reset module when student changes
         setStudentSearch(`${student.prenom} ${student.nom} (${student.matricule})`);
         setShowStudentResults(false);
-        
+
         // Load modules for this student
         try {
             const response = await fetch(`/api/students/${student.id}/modules`, {
@@ -211,7 +213,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         setStudentSearchResults([]);
         setShowStudentResults(false);
         setErrors({});
-        
+
         // Load modules for this student
         if (absence.student_id) {
             try {
@@ -235,7 +237,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         } else {
             setAvailableModules(safeModules);
         }
-        
+
         setShowModal(true);
     };
 
@@ -243,10 +245,10 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     const handleSubmit = (e) => {
         e.preventDefault();
         setErrors({});
-        
+
         const url = editingAbsence ? `/admin/absences/${editingAbsence.id}` : '/admin/absences';
         const method = editingAbsence ? 'patch' : 'post';
-        
+
         router[method](url, formData, {
             preserveScroll: true,
             onSuccess: () => {
@@ -274,10 +276,10 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
 
     const confirmDelete = () => {
         if (!deleteModal) return;
-        
-        const motifSuppression = prompt('Reason for deletion (optional):');
+
+        const motifSuppression = prompt('Motif de suppression (optionnel) :');
         const data = motifSuppression ? { motif_suppression: motifSuppression } : {};
-        
+
         router.delete(`/admin/absences/${deleteModal.id}`, {
             data,
             preserveState: true,
@@ -292,16 +294,16 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 if (errs.message && errs.message.includes('419') || errs.message && errs.message.includes('CSRF')) {
                     window.location.reload();
                 } else {
-                    alert('Error deleting absence: ' + (errs.message || 'Unknown error'));
-                }
+                            alert('Erreur lors de la suppression de l\'absence : ' + (errs.message || 'Erreur inconnue'));
+                        }
             }
         });
     };
 
     // Handle restore
     const handleRestore = (absence) => {
-        if (!window.confirm('Are you sure you want to restore this absence?')) return;
-        
+        if (!window.confirm('Êtes-vous sûr de vouloir restaurer cette absence ?')) return;
+
         router.post(`/admin/absences/${absence.id}/restore`, {}, {
             preserveScroll: true,
             onSuccess: () => {
@@ -311,7 +313,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 if (errs.message && (errs.message.includes('419') || errs.message.includes('CSRF'))) {
                     window.location.reload();
                 } else {
-                    alert('Error restoring absence: ' + (errs.message || 'Unknown error'));
+                    alert('Erreur lors de la restauration de l\'absence : ' + (errs.message || 'Erreur inconnue'));
                 }
             }
         });
@@ -322,22 +324,22 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
         setFilters({ search: '', module_id: '', status: 'Active', annee: '', specialite_id: '', option_id: '' });
         router.get('/admin/absences/manage', { status: 'Active' }, { preserveState: true });
     };
-    
+
     // Apply filters helper
     const applyFilters = useCallback((newFilters) => {
         const updatedFilters = { ...filters, ...newFilters };
         setFilters(updatedFilters);
-        
+
         const params = {};
         if (updatedFilters.search) params.search = updatedFilters.search;
         if (updatedFilters.module_id) params.module_id = updatedFilters.module_id;
         if (updatedFilters.status) params.status = updatedFilters.status;
-        
+
         // Year filter (independent)
         if (updatedFilters.annee !== undefined && updatedFilters.annee !== null) {
             params.annee = updatedFilters.annee;
         }
-        
+
         // Speciality filter (independent)
         if (updatedFilters.specialite_id !== undefined) {
             if (updatedFilters.specialite_id === null) {
@@ -346,7 +348,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 params.specialite_id = updatedFilters.specialite_id;
             }
         }
-        
+
         // Option filter (depends on specialite)
         if (updatedFilters.option_id !== undefined) {
             if (updatedFilters.option_id === null) {
@@ -355,9 +357,9 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 params.option_id = updatedFilters.option_id;
             }
         }
-        
-        router.get('/admin/absences/manage', params, { 
-            preserveState: true, 
+
+        router.get('/admin/absences/manage', params, {
+            preserveState: true,
             preserveScroll: true,
             only: ['res', 'stats', 'filters', 'available_filters']
         });
@@ -366,7 +368,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
     // Dropdown component
     const Dropdown = ({ label, value, isOpen, onToggle, children }) => (
         <div className="relative">
-            <button 
+            <button
                 onClick={onToggle}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors whitespace-nowrap min-w-[120px]"
             >
@@ -422,35 +424,35 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Absences Management</h1>
-                        <p className="text-gray-500 mt-1 text-sm">Track, justify, and manage student attendance records.</p>
+                            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Gestion des absences</h1>
+                            <p className="text-gray-500 mt-1 text-sm">Suivre, justifier et gérer les absences des élèves.</p>
                     </div>
-                    <button 
+                    <button
                         onClick={openCreateModal}
                         className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm"
                     >
                         <Plus className="w-4 h-4" />
-                        Record Absence
+                        Enregistrer une absence
                     </button>
                 </div>
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <KpiCard title="New Absences (Today)" value={safeStats.new_absences?.value || '0'} trend={safeStats.new_absences?.trend || null} trendType={safeStats.new_absences?.trend_type || 'up_bad'} color="red" />
-                    <KpiCard title="Most Absent Module" value={safeStats.most_absent_module?.value || 'N/A'} subtext={safeStats.most_absent_module?.subtext || 'No data'} icon={Calculator} color="blue" />
-                    <KpiCard title="Warning List" value={safeStats.warning_list?.value || '0'} subtext={safeStats.warning_list?.subtext || 'Students approaching limit'} icon={AlertTriangle} color="orange" />
+                    <KpiCard title="Nouvelles absences (aujourd'hui)" value={safeStats.new_absences?.value || '0'} trend={safeStats.new_absences?.trend || null} trendType={safeStats.new_absences?.trend_type || 'up_bad'} color="red" />
+                    <KpiCard title="Module le plus absent" value={safeStats.most_absent_module?.value || 'N/A'} subtext={safeStats.most_absent_module?.subtext || 'Aucune donnée'} icon={Calculator} color="blue" />
+                    <KpiCard title="Liste d'alerte" value={safeStats.warning_list?.value || '0'} subtext={safeStats.warning_list?.subtext || 'Élèves proches du seuil'} icon={AlertTriangle} color="orange" />
                 </div>
 
                 {/* Filters */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
                     <div className="flex flex-wrap items-center gap-4">
                         <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filters:</span>
-                            
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filtres :</span>
+
                             {/* Year Dropdown */}
                             <Dropdown
-                                label="Year"
-                                value={currentYear ? `Year ${currentYear}` : 'All'}
+                                label="Année"
+                                value={currentYear ? `Année ${currentYear}` : 'Toutes'}
                                 isOpen={openDropdown === 'year'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
                             >
@@ -459,7 +461,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                         onClick={() => applyFilters({ annee: null, specialite_id: currentSpecialiteId, option_id: currentOptionId })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Years
+                                        Toutes les années
                                     </button>
                                     {years.map(year => (
                                         <button
@@ -467,7 +469,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                             onClick={() => applyFilters({ annee: year, specialite_id: currentSpecialiteId, option_id: currentOptionId })}
                                             className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentYear == year ? 'bg-blue-50 text-blue-600' : ''}`}
                                         >
-                                            Year {year}
+                                            Année {year}
                                         </button>
                                     ))}
                                 </div>
@@ -475,18 +477,18 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
 
                             {/* Speciality Dropdown */}
                             <Dropdown
-                                label="Speciality"
-                                value={currentSpecialiteId ? (specialites.find(s => s.id == currentSpecialiteId)?.libelle || 'All') : 'All'}
+                                label="Spécialité"
+                                value={currentSpecialiteId ? (specialites.find(s => s.id == currentSpecialiteId)?.libelle || 'Toutes') : 'Toutes'}
                                 isOpen={openDropdown === 'speciality'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'speciality' ? null : 'speciality')}
                             >
                                 <div className="p-2">
-                                    <button
-                                        onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null })}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
-                                    >
-                                        All Specialities
-                                    </button>
+                                        <button
+                                            onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null })}
+                                            className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
+                                        >
+                                            Toutes les spécialités
+                                        </button>
                                     {Object.keys(specialitesByLibelle).length > 0 ? (
                                         Object.values(specialitesByLibelle).map((group) => {
                                             if (!group || !group.libelle) return null;
@@ -502,7 +504,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                                 <button
                                                     key={group.libelle}
                                                     onClick={() => {
-                                                        const specToSelect = currentYear && group.specialites 
+                                                        const specToSelect = currentYear && group.specialites
                                                             ? group.specialites.find(s => s.annee == currentYear) || group.specialites[0]
                                                             : group.specialites[0];
                                                         if (specToSelect) {
@@ -516,7 +518,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                             );
                                         })
                                     ) : (
-                                        <div className="px-4 py-2 text-sm text-gray-500">No specialities available</div>
+                                        <div className="px-4 py-2 text-sm text-gray-500">Aucune spécialité disponible</div>
                                     )}
                                 </div>
                             </Dropdown>
@@ -524,7 +526,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                             {/* Option Dropdown */}
                             <Dropdown
                                 label="Option"
-                                value={currentOptionId ? (filteredOptions.find(o => o.id == currentOptionId)?.libelle || 'All') : 'All'}
+                                value={currentOptionId ? (filteredOptions.find(o => o.id == currentOptionId)?.libelle || 'Toutes') : 'Toutes'}
                                 isOpen={openDropdown === 'option'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'option' ? null : 'option')}
                             >
@@ -533,7 +535,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                         onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: null })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Options
+                                        Toutes les options
                                     </button>
                                     {filteredOptions.length > 0 ? (
                                         filteredOptions.map(opt => (
@@ -546,14 +548,14 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                             </button>
                                         ))
                                     ) : (
-                                        <div className="px-4 py-2 text-sm text-gray-500">No options available</div>
+                                        <div className="px-4 py-2 text-sm text-gray-500">Aucune option disponible</div>
                                     )}
                                 </div>
                             </Dropdown>
                         </div>
-                        
+
                         <div className="flex-1"></div>
-                        
+
                         {/* Search and other filters */}
                         <div className="flex items-center gap-3 flex-wrap">
                             <div className="relative">
@@ -562,47 +564,47 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                 type="text"
                                     value={filters.search || ''}
                                     onChange={(e) => handleSearch(e.target.value)}
-                                    placeholder="Search student..."
+                                    placeholder="Chercher un élève..."
                                     className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
                             />
                         </div>
-                            <select 
+                            <select
                                 value={filters.module_id || ''}
                                 onChange={(e) => handleFilterChange('module_id', e.target.value)}
                                 className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="">All Modules</option>
+                                <option value="">Tous les modules</option>
                                 {safeModules.map((module) => (
                                     <option key={module.id} value={module.id}>{module.libelle}</option>
                                 ))}
                             </select>
                             <div className="flex bg-gray-100 p-1 rounded-xl">
-                                <button 
+                                <button
                                     onClick={() => handleFilterChange('status', 'Active')}
                                     className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                        filters.status === 'Active' 
-                                            ? 'bg-white shadow-sm text-gray-900' 
+                                        filters.status === 'Active'
+                                            ? 'bg-white shadow-sm text-gray-900'
                                             : 'text-gray-500 hover:text-gray-900'
                                     }`}
                                 >
-                                    Active
+                                    Actifs
                                 </button>
-                            <button 
+                            <button
                                 onClick={() => handleFilterChange('status', 'Deleted')}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                    filters.status === 'Deleted' 
-                                        ? 'bg-white shadow-sm text-gray-900' 
+                                    filters.status === 'Deleted'
+                                        ? 'bg-white shadow-sm text-gray-900'
                                         : 'text-gray-500 hover:text-gray-900'
                                 }`}
                             >
-                                Deleted
+                                Supprimés
                             </button>
                         </div>
-                        <button 
+                        <button
                             onClick={clearFilters}
                             className="text-sm font-bold text-blue-600 hover:text-blue-800"
                         >
-                            Clear Filters
+                            Réinitialiser les filtres
                         </button>
                     </div>
                 </div>
@@ -616,11 +618,11 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                     <th className="px-6 py-4 w-10">
                                         <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                     </th>
-                                    <th className="px-6 py-4">Student</th>
-                                    <th className="px-6 py-4">Class</th>
+                                    <th className="px-6 py-4">Élève</th>
+                                    <th className="px-6 py-4">Classe</th>
                                     <th className="px-6 py-4">Module</th>
-                                    <th className="px-6 py-4">Date & Time</th>
-                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4">Date et heure</th>
+                                    <th className="px-6 py-4">Statut</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -628,15 +630,15 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                 {formattedAbsences.length === 0 ? (
                                     <tr>
                                         <td colSpan="7" className="px-6 py-8 text-center text-gray-500 font-medium">
-                                            No absences found
+                                            Aucune absence trouvée
                                         </td>
                                     </tr>
                                 ) : (
                                     formattedAbsences.map((record) => {
                                         const studentInitial = record.student.name ? record.student.name.charAt(0).toUpperCase() : '?';
-                                        const statusColor = record.status === 'Unjustified' ? 'bg-red-50 text-red-600' :
-                                            record.status === 'Justified' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500';
-                                        
+                                        const statusColor = record.statusKey === 'unjustified' ? 'bg-red-50 text-red-600' :
+                                            record.statusKey === 'justified' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500';
+
                                         return (
                                             <tr key={record.id} className={`group transition-colors ${record.isDeleted ? 'bg-gray-50/50' : 'hover:bg-blue-50/30'}`}>
                                                 <td className="px-6 py-4">
@@ -661,8 +663,8 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${statusColor}`}>
-                                                        {record.status === 'Justified' && <CheckCircle className="w-3 h-3" />}
-                                                        {record.status}
+                                                        {record.statusKey === 'justified' && <CheckCircle className="w-3 h-3" />}
+                                                        {record.statusLabel}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
@@ -672,22 +674,22 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                                                 onClick={() => handleRestore(record)}
                                                                 className="text-xs font-bold text-blue-600 flex items-center gap-1 cursor-pointer hover:underline"
                                                             >
-                                                                <RotateCcw className="w-3 h-3" /> Restore
+                                                                <RotateCcw className="w-3 h-3" /> Restaurer
                                                             </button>
                                                         </div>
                                                     ) : (
                                                         <div className="flex justify-end gap-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={() => openEditModal(record)}
                                                                 className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Edit"
+                                                                title="Modifier"
                                                             >
                                                                 <Pencil className="w-4 h-4" />
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleDelete(record)}
                                                                 className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                title="Delete"
+                                                                title="Supprimer"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -705,11 +707,11 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                     {safeRes.last_page > 1 && (
                         <div className="p-4 border-t border-gray-50 flex justify-between items-center text-sm">
                             <span className="text-gray-500 font-medium">
-                                Showing <span className="font-bold text-gray-900">{safeRes.from || 0}</span> to <span className="font-bold text-gray-900">{safeRes.to || 0}</span> of <span className="font-bold text-gray-900">{safeRes.total || 0}</span> results
+                                Affiche <span className="font-bold text-gray-900">{safeRes.from || 0}</span> à <span className="font-bold text-gray-900">{safeRes.to || 0}</span> sur <span className="font-bold text-gray-900">{safeRes.total || 0}</span> résultats
                             </span>
                             <div className="flex items-center gap-2">
                                 {safeRes.current_page > 1 ? (
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             const params = {};
                                             if (filters.search) params.search = filters.search;
@@ -722,11 +724,11 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                             router.get('/admin/absences/manage', params, { preserveState: true, preserveScroll: true });
                                         }}
                                         className="px-4 py-2 border border-gray-200 rounded-lg text-gray-600 font-bold hover:bg-gray-50 transition-colors"
-                                    >
-                                        Previous
+                                        >
+                                        Précédent
                                     </button>
                                 ) : (
-                                    <span className="px-4 py-2 text-gray-400 font-medium">Previous</span>
+                                    <span className="px-4 py-2 text-gray-400 font-medium">Précédent</span>
                                 )}
                                 {Array.from({ length: Math.min(5, safeRes.last_page) }, (_, i) => {
                                     let pageNum;
@@ -778,10 +780,10 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                         }}
                                         className="px-4 py-2 text-gray-600 font-bold hover:text-blue-600"
                                     >
-                                        Next
+                                        Suivant
                                     </button>
                                 ) : (
-                                    <span className="px-4 py-2 text-gray-400 font-medium">Next</span>
+                                    <span className="px-4 py-2 text-gray-400 font-medium">Suivant</span>
                                 )}
                             </div>
                         </div>
@@ -795,8 +797,8 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                             <h2 className="text-2xl font-black text-gray-900">
-                                {editingAbsence ? 'Edit Absence' : 'Record New Absence'}
-                            </h2>
+                                    {editingAbsence ? 'Modifier l\'absence' : 'Enregistrer une nouvelle absence'}
+                                </h2>
                             <button
                                 onClick={() => {
                                     setShowModal(false);
@@ -813,7 +815,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                             {/* Student Search */}
                             <div className="relative">
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Student *
+                                    Élève *
                                 </label>
                                 <div className="relative">
                                     <input
@@ -821,7 +823,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                         value={studentSearch}
                                         onChange={(e) => handleStudentSearch(e.target.value)}
                                         onFocus={() => studentSearch.length >= 2 && setShowStudentResults(true)}
-                                        placeholder="Search by name or matricule..."
+                                        placeholder="Chercher par nom ou matricule..."
                                         className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${
                                             errors.student_id ? 'border-red-500' : 'border-gray-200'
                                         }`}
@@ -849,7 +851,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                     )}
                                     {showStudentResults && studentSearch.length >= 2 && studentSearchResults.length === 0 && (
                                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 text-sm text-gray-500">
-                                            No students found
+                                            Aucun élève trouvé
                                         </div>
                                     )}
                                 </div>
@@ -873,7 +875,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                     disabled={!formData.student_id}
                                 >
                                     <option value="">
-                                        {!formData.student_id ? 'Select a student first' : 'Select Module'}
+                                        {!formData.student_id ? 'Sélectionnez d\'abord un élève' : 'Sélectionner le module'}
                                     </option>
                                     {availableModules.map((module) => (
                                         <option key={module.id} value={module.id}>
@@ -908,7 +910,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                             {/* Motif Input */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Reason *
+                                    Motif *
                                 </label>
                                 <textarea
                                     value={formData.motif_absence}
@@ -933,7 +935,7 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                         onChange={(e) => setFormData({ ...formData, justifie: e.target.checked })}
                                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                     />
-                                    <span className="text-sm font-bold text-gray-700">Justified</span>
+                                    <span className="text-sm font-bold text-gray-700">Justifié</span>
                                 </label>
                             </div>
 
@@ -948,13 +950,13 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                                     }}
                                     className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
                                 >
-                                    Cancel
+                                    Annuler
                                 </button>
                                 <button
                                     type="submit"
                                     className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all"
                                 >
-                                    {editingAbsence ? 'Update' : 'Create'}
+                                    {editingAbsence ? 'Mettre à jour' : 'Enregistrer'}
                                 </button>
                             </div>
                         </form>
@@ -967,24 +969,24 @@ export default function AbsencesAdmin({ res = {}, stats = {}, modules = [], stud
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
                         <div className="p-6 border-b border-gray-200">
-                            <h2 className="text-2xl font-black text-gray-900">Confirm Deletion</h2>
+                            <h2 className="text-2xl font-black text-gray-900">Confirmer la suppression</h2>
                         </div>
                         <div className="p-6">
-                            <p className="text-gray-700 mb-4">
-                                Are you sure you want to delete this absence record? This action can be undone by restoring the record.
-                            </p>
+                                <p className="text-gray-700 mb-4">
+                                    Voulez-vous vraiment supprimer cet enregistrement d\'absence ? Cette action peut être annulée en restaurant l\'enregistrement.
+                                </p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setDeleteModal(null)}
                                     className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
                                 >
-                                    Cancel
+                                        Annuler
                                 </button>
                                 <button
                                     onClick={confirmDelete}
                                     className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all"
                                 >
-                                    Delete
+                                        Supprimer
                                 </button>
                             </div>
                         </div>

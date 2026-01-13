@@ -1,29 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { Search, Filter, BookOpen, Calculator, Calendar } from 'lucide-react';
-
-// Use a simple layout placeholder or import your actual layout
-// Assuming existing AdminLayout or creating a new StudentLayout later.
-// For now, using a simple wrapper.
-const StudentLayout = ({ children }) => (
-    <div className="min-h-screen bg-gray-50 font-sans">
-        <nav className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
-                <span className="font-bold text-xl text-blue-600">My Portal</span>
-                <div className="flex gap-4">
-                    <a href="/student/dashboard" className="text-gray-600 hover:text-blue-600">Dashboard</a>
-                    <a href="/student/notes" className="text-blue-600 font-bold">Notes</a>
-                    <a href="/student/absences" className="text-gray-600 hover:text-blue-600">Absences</a>
-                </div>
-            </div>
-        </nav>
-        <main className="p-4 md:p-8 max-w-7xl mx-auto">
-            {children}
-        </main>
-    </div>
-);
+import StudentLayout from '../../Layouts/StudentLayout';
+import { useFlashMessage } from '../../hooks/useNotify';
 
 export default function StudentNotes() {
+    useFlashMessage();
     const [notes, setNotes] = useState([]);
     const [modules, setModules] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -123,20 +105,20 @@ export default function StudentNotes() {
 
     return (
         <StudentLayout>
-            <Head title="My Grades" />
+            <Head title="Mes Notes - Gestion Scolaire" />
 
             <div className="mb-8">
-                <h1 className="text-3xl font-black text-gray-900">My Grades</h1>
-                <p className="text-gray-500 mt-1">View your academic performance and grades.</p>
+                <h1 className="text-3xl font-black text-gray-900">Mes Notes</h1>
+                <p className="text-gray-500 mt-1">Consultez vos performances académiques et vos notes.</p>
             </div>
 
-            {/* Filters */}
+            {/* Filtres */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4 items-center">
                 <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <input
                         type="text"
-                        placeholder="Search module..."
+                        placeholder="Chercher un module..."
                         value={filters.search}
                         onChange={(e) => handleFilterChange('search', e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
@@ -148,7 +130,7 @@ export default function StudentNotes() {
                     onChange={(e) => handleFilterChange('module_id', e.target.value)}
                     className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
                 >
-                    <option value="">All Modules</option>
+                    <option value="">Tous les Modules</option>
                     {modules.map(m => (
                         <option key={m.id} value={m.id}>{m.libelle}</option>
                     ))}
@@ -159,23 +141,23 @@ export default function StudentNotes() {
                     onChange={(e) => handleFilterChange('semester', e.target.value)}
                     className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700"
                 >
-                    <option value="">All Semesters</option>
+                    <option value="">Tous les Semestres</option>
                     {[1, 2, 3, 4, 5, 6].map(s => (
-                        <option key={s} value={s}>Semester {s}</option>
+                        <option key={s} value={s}>Semestre {s}</option>
                     ))}
                 </select>
             </div>
 
-            {/* Content */}
+            {/* Contenu */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-bold border-b border-gray-100">
                             <tr>
                                 <th className="px-6 py-4">Module</th>
-                                <th className="px-6 py-4">Semester</th>
+                                <th className="px-6 py-4">Semestre</th>
                                 <th className="px-6 py-4">Type</th>
-                                <th className="px-6 py-4">Grade</th>
+                                <th className="px-6 py-4">Note</th>
                                 <th className="px-6 py-4">Coef</th>
                                 {/* <th className="px-6 py-4">Actions</th> */}
                             </tr>
@@ -183,11 +165,11 @@ export default function StudentNotes() {
                         <tbody className="divide-y divide-gray-50">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">Loading grades...</td>
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">Chargement des notes...</td>
                                 </tr>
                             ) : notes.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">No grades found.</td>
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">Aucune note trouvée.</td>
                                 </tr>
                             ) : (
                                 notes.map(note => (
@@ -251,7 +233,7 @@ export default function StudentNotes() {
                 {!loading && pagination.last_page > 1 && (
                     <div className="p-4 border-t border-gray-100 flex justify-between items-center text-sm">
                         <span className="text-gray-500">
-                            Showing <span className="font-bold">{pagination.from}</span> to <span className="font-bold">{pagination.to}</span> of <span className="font-bold">{pagination.total}</span>
+                            Affiche <span className="font-bold">{pagination.from}</span> à <span className="font-bold">{pagination.to}</span> sur <span className="font-bold">{pagination.total}</span>
                         </span>
                         <div className="flex gap-2">
                             <button
@@ -259,14 +241,14 @@ export default function StudentNotes() {
                                 onClick={() => fetchNotes(filters, pagination.current_page - 1)}
                                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
                             >
-                                Previous
+                                Précédent
                             </button>
                             <button
                                 disabled={pagination.current_page === pagination.last_page}
                                 onClick={() => fetchNotes(filters, pagination.current_page + 1)}
                                 className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
                             >
-                                Next
+                                Suivant
                             </button>
                         </div>
                     </div>
@@ -275,3 +257,5 @@ export default function StudentNotes() {
         </StudentLayout>
     );
 }
+
+StudentNotes.layout = StudentLayout;

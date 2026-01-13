@@ -87,8 +87,8 @@ export default function AdminNotes({meta,res}){
                                 <td>{n.note}</td>
                                 <td>{n.classe}</td>
                                 <td className="text-right">
-                                    <button onClick={()=>openEdit(n)} className="text-sky-600 mr-2">Edit</button>
-                                    <button onClick={()=>destroy(n.id)} className="text-red-600">Delete</button>
+                                    <button onClick={()=>openEdit(n)} className="text-sky-600 mr-2">Modifier</button>
+                                    <button onClick={()=>destroy(n.id)} className="text-red-600">Supprimer</button>
                                 </td>
                             </tr>
                         ))}
@@ -100,8 +100,8 @@ export default function AdminNotes({meta,res}){
                         Page {res.current_page} / {res.last_page}
                     </div>
                     <div className="space-x-2">
-                        {res.prev_page_url && <button onClick={()=>fetchPage(res.current_page-1)} className="px-3 py-1 rounded bg-gray-200">Préc</button>}
-                        {res.next_page_url && <button onClick={()=>fetchPage(res.current_page+1)} className="px-3 py-1 rounded bg-gray-200">Suiv</button>}
+                        {res.prev_page_url && <button onClick={()=>fetchPage(res.current_page-1)} className="px-3 py-1 rounded bg-gray-200">Précédent</button>}
+                        {res.next_page_url && <button onClick={()=>fetchPage(res.current_page+1)} className="px-3 py-1 rounded bg-gray-200">Suivant</button>}
                     </div>
                 </div>
             </div>

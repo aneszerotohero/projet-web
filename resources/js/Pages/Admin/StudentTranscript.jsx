@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import {
-    ArrowLeft, Printer, Download, BarChart3, CheckCircle,
+    ArrowLeft, Download, BarChart3, CheckCircle,
     AlertTriangle, XCircle, Calendar, FileText
 } from 'lucide-react';
 
@@ -96,7 +96,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                             <ArrowLeft className="w-5 h-5 text-gray-600" />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-black text-gray-900">Student Transcript</h1>
+                            <h1 className="text-3xl font-black text-gray-900">Relevé de l'élève</h1>
                             <p className="text-gray-600 mt-1">
                                 {student?.prenom} {student?.nom} • {student?.user?.matricule || 'N/A'}
                                 {student?.option && ` • ${student.option.libelle}`}
@@ -104,16 +104,6 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button
-                            onClick={() => {
-                                // Print current page
-                                window.print();
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm"
-                        >
-                            <Printer className="w-4 h-4" />
-                            Print
-                        </button>
                         <button
                             onClick={() => {
                                 // Direct download - export routes don't need Inertia
@@ -125,7 +115,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm"
                         >
                             <Download className="w-4 h-4" />
-                            Export PDF
+                            Exporter en PDF
                         </button>
                     </div>
                 </div>
@@ -133,7 +123,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                 {/* Semester Filter */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8">
                     <div className="flex items-center gap-4 flex-wrap">
-                        <span className="text-sm font-bold text-gray-700">Filter by Semester:</span>
+                        <span className="text-sm font-bold text-gray-700">Filtrer par semestre :</span>
                         <button
                             onClick={() => handleSemesterChange('all')}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${semesterFilter === 'all'
@@ -141,7 +131,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
-                            All Semesters
+                            Tous les semestres
                         </button>
                         {[1, 2, 3, 4, 5, 6].map(sem => (
                             <button
@@ -180,14 +170,14 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                             <span className="text-gray-400 font-medium text-lg">/20</span>
                         </div>
                         <p className="text-xs text-gray-500 mt-2 font-medium">
-                            {generalAverage >= 10 ? 'Passing' : 'Failing'}
+                            {generalAverage >= 10 ? 'Admis' : 'Non admis'}
                         </p>
                     </div>
 
                     {/* Total Notes */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                         <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Total Notes</h3>
+                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Total des notes</h3>
                             <FileText className="w-5 h-5 text-green-500" />
                         </div>
                         <div className="flex items-baseline gap-1 mt-1">
@@ -205,13 +195,13 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                         <div className="flex items-baseline gap-1 mt-1">
                             <span className="text-3xl font-black text-gray-900">{moduleAverages.length}</span>
                         </div>
-                        <p className="text-sm text-gray-900 font-bold mt-2">Active modules</p>
+                        <p className="text-sm text-gray-900 font-bold mt-2">Modules actifs</p>
                     </div>
 
                     {/* Semester Averages */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                         <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Semester Averages</h3>
+                            <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">Moyennes semestrielles</h3>
                             <Calendar className="w-5 h-5 text-purple-500" />
                         </div>
                         <div className="mt-1 space-y-1">
@@ -248,7 +238,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                                 {moduleAverages.length === 0 ? (
                                     <tr>
                                         <td colSpan="5" className="px-6 py-8 text-center text-gray-500 font-medium">
-                                            No notes found for the selected semester
+                                            Aucune note trouvée pour le semestre sélectionné
                                         </td>
                                     </tr>
                                 ) : (
@@ -269,12 +259,12 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                                                 {average >= 10 ? (
                                                     <span className="inline-flex items-center gap-1 text-green-600 text-sm font-bold">
                                                         <CheckCircle className="w-4 h-4" />
-                                                        Passing
+                                                        Admis
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 text-red-600 text-sm font-bold">
                                                         <XCircle className="w-4 h-4" />
-                                                        Failing
+                                                        Ajourné
                                                     </span>
                                                 )}
                                             </td>
@@ -289,15 +279,15 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                 {/* Detailed Grades Table (Grouped by Module) */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden space-y-8 p-6">
                     <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                        <h2 className="font-bold text-gray-900 text-lg">Detailed Transcript</h2>
+                        <h2 className="font-bold text-gray-900 text-lg">Relevé détaillé</h2>
                         <span className="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">
-                            {moduleAverages.length} Modules / {filteredNotes} Grades
+                            {moduleAverages.length} modules / {filteredNotes} notes
                         </span>
                     </div>
 
                     {moduleAverages.length === 0 ? (
                         <div className="text-center py-8 text-gray-500 font-medium">
-                            No grades found for the selected semester
+                            Aucune note trouvée pour le semestre sélectionné
                         </div>
                     ) : (
                         moduleAverages.map(({ module, average, notes: moduleNotes }) => (
@@ -350,7 +340,7 @@ export default function StudentTranscript({ student, notes = [], notes_by_module
                                                 return (
                                                     <tr key={note.id} className="hover:bg-gray-50/50">
                                                         <td className="px-6 py-3 text-gray-600">
-                                                            {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                            {date.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' })}
                                                         </td>
                                                         <td className="px-6 py-3 font-bold text-gray-700">
                                                             <span className={`px-2 py-1 rounded text-xs ${note.coef?.libelle === 'Exam' ? 'bg-purple-100 text-purple-700' :

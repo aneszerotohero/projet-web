@@ -13,7 +13,7 @@ class StudentDashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         // TEMP: Return mock data for frontend development if no user is logged in
         if (! $user || ! $user->student) {
             $mockPayload = [
@@ -104,7 +104,7 @@ class StudentDashboardController extends Controller
                 ],
                 'current_semestre' => 'S1',
             ];
-            
+
             if (class_exists(\Inertia\Inertia::class)) {
                 return \Inertia\Inertia::render('Eleve/Dashboard', $mockPayload);
             }
@@ -154,8 +154,9 @@ class StudentDashboardController extends Controller
         // Placeholder for correction logic
         // $request->validate([...]);
         // CorrectionRequest::create([...]);
-        
-        return response()->noContent();
+
+        return to_route('eleve.notes', [], 303)
+            ->with('success', 'Demande de correction envoyée');
     }
 
     public function requestJustification(Request $request)
@@ -164,6 +165,7 @@ class StudentDashboardController extends Controller
         // $request->validate([...]);
         // Justification::create([...]);
 
-        return response()->noContent();
+        return to_route('eleve.absences', [], 303)
+            ->with('success', 'Demande de justification envoyée');
     }
 }

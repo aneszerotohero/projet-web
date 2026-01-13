@@ -11,10 +11,11 @@
         "@inertiajs/progress": "^0.2.7",
         "@inertiajs/react": "^2.3.6",
         "axios": "^1.13.2",
-        "chart.js": "^4.3.0",
+        "chart.js": "^4.5.1",
         "framer-motion": "^7.0.0",
         "lucide-react": "^0.562.0",
         "react": "^18.2.0",
+        "react-chartjs-2": "^5.3.1",
         "react-dom": "^18.2.0"
     },
     "devDependencies": {

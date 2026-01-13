@@ -11,7 +11,7 @@ class AbsenceController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         // TEMP: Return mock data for frontend development if no user is logged in
         if (!$user) {
             $mockData = [
@@ -31,7 +31,7 @@ class AbsenceController extends Controller
                 'trends' => [
                     // Mock trend data for last 6 months
                     'months' => ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
-                    'data' => [2, 0, 4, 3, 2, 3] 
+                    'data' => [2, 0, 4, 3, 2, 3]
                 ],
                 'absences' => [
                     [
@@ -67,13 +67,13 @@ class AbsenceController extends Controller
                     // Add more if needed...
                 ]
             ];
-            
+
             if (class_exists(\Inertia\Inertia::class)) {
                 return \Inertia\Inertia::render('Eleve/Absences', $mockData);
             }
             return response()->json($mockData);
         }
-        
+
         $studentId = $user->student_id ?? ($user->student->id ?? null);
         if (! $studentId) {
             abort(404, 'Student not found.');
@@ -101,7 +101,8 @@ class AbsenceController extends Controller
 
         Absence::create($data);
 
-        return response()->noContent();
+        return to_route('admin.absences.manage')
+            ->with('success', 'Absence créée avec succès');
     }
 
     public function update(Request $request, Absence $absence)
@@ -115,7 +116,8 @@ class AbsenceController extends Controller
 
         $absence->update($data);
 
-        return response()->noContent();
+        return to_route('admin.absences.manage', [], 303)
+            ->with('success', 'Absence mise à jour avec succès');
     }
 
     public function destroy(Request $request, Absence $absence)
@@ -130,7 +132,8 @@ class AbsenceController extends Controller
 
         $absence->delete();
 
-        return response()->noContent();
+        return to_route('admin.absences.manage', [], 303)
+            ->with('success', 'Absence supprimée avec succès');
     }
 
     public function restore(Request $request, $id)
@@ -139,7 +142,8 @@ class AbsenceController extends Controller
         $absence->restore();
         $absence->update(['motif_suppression' => null]);
 
-        return response()->noContent();
+        return to_route('admin.absences.manage', [], 303)
+            ->with('success', 'Absence restaurée avec succès');
     }
 
     public function filter(Request $request)
@@ -221,19 +225,19 @@ class AbsenceController extends Controller
     public function stats()
     {
         $newAbsencesToday = Absence::whereDate('created_at', today())->count();
-        
+
         $mostAbsentModule = Absence::with('module')
             ->select('module_id', DB::raw('count(*) as total'))
             ->groupBy('module_id')
             ->orderByDesc('total')
             ->first();
-        
+
         $warningList = \App\Models\Student::whereHas('absences', function($q) {
             $q->where('justifie', false);
         })->get()->filter(function($student) {
             return $student->absences()->where('justifie', false)->count() >= 3;
         })->count();
-        
+
         return [
             'new_absences' => [
                 'value' => number_format($newAbsencesToday, 0),

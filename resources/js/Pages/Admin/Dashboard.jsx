@@ -2,14 +2,13 @@ import React, { useState, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import AdminLayout from '../../Layouts/AdminLayout';
 import {
-    Download, Users, BarChart3, CheckCircle, AlertTriangle,
-    Search, Filter, ChevronDown, Trophy, Eye, Pencil, X
+    Download, Users, Search, Filter, ChevronDown, Trophy, Eye, Pencil, X
 } from 'lucide-react';
 
-export default function AdminDashboard({ 
-    podium = [], 
-    others = [], 
-    ranking_stats = {}, 
+export default function AdminDashboard({
+    podium = [],
+    others = [],
+    ranking_stats = {},
     filters = {},
     available_filters = {}
 }) {
@@ -19,41 +18,41 @@ export default function AdminDashboard({
     const safeRankingStats = ranking_stats || {};
     const safeFilters = filters || {};
     const safeAvailableFilters = available_filters || {};
-    
+
     const specialitesByLibelle = safeAvailableFilters.specialites_by_libelle || {};
     const specialites = safeAvailableFilters.specialites || [];
     const options = safeAvailableFilters.options || [];
     const years = safeAvailableFilters.years || [1, 2, 3];
     const semesters = safeAvailableFilters.semesters || [];
-    
+
     // Filter states
     const [openDropdown, setOpenDropdown] = useState(null);
     const [searchTerm, setSearchTerm] = useState(safeFilters.search || '');
     const [searchTimeout, setSearchTimeout] = useState(null);
-    
+
     // Current filter values
     const currentYear = safeFilters.year || null;
     const currentSpecialiteId = safeFilters.specialite_id || null;
     const currentOptionId = safeFilters.option_id || null;
     const currentSemester = safeFilters.semester || 'cycle';
-    
+
     // Get filtered options based on selected specialite
-    const filteredOptions = currentSpecialiteId 
+    const filteredOptions = currentSpecialiteId
         ? options.filter(opt => {
             const specialite = safeAvailableFilters.specialites?.find(s => s.id == currentSpecialiteId);
             return specialite && opt.specialite_id == currentSpecialiteId;
         })
         : options;
-    
+
     // Handle filter changes
     const applyFilters = useCallback((newFilters) => {
         const params = {};
-        
+
         // Year filter (independent - 1, 2, or 3)
         if (newFilters.annee !== undefined && newFilters.annee !== null) {
             params.annee = newFilters.annee;
         }
-        
+
         // Speciality filter (independent - by libelle only)
         // When year is set, we auto-select the matching specialite for that year
         if (newFilters.specialite_id !== undefined) {
@@ -63,7 +62,7 @@ export default function AdminDashboard({
                 params.specialite_id = newFilters.specialite_id;
             }
         }
-        
+
         // Option filter (depends on specialite)
         if (newFilters.option_id !== undefined) {
             if (newFilters.option_id === null) {
@@ -72,31 +71,31 @@ export default function AdminDashboard({
                 params.option_id = newFilters.option_id;
             }
         }
-        
+
         // Semester filter
         if (newFilters.semester !== undefined) {
             params.semester = newFilters.semester;
         }
-        
+
         // Search filter
         if (newFilters.search !== undefined) {
             params.search = newFilters.search;
         }
-        
-        router.get('/admin/dashboard', params, { 
-            preserveState: true, 
+
+        router.get('/admin/dashboard', params, {
+            preserveState: true,
             preserveScroll: true,
             only: ['podium', 'others', 'ranking_stats', 'filters', 'available_filters']
         });
         setOpenDropdown(null);
     }, []);
-    
+
     // Handle search with debounce
     const handleSearch = useCallback((value) => {
         setSearchTerm(value);
-        
+
         if (searchTimeout) clearTimeout(searchTimeout);
-        
+
         const timeout = setTimeout(() => {
             applyFilters({
                 annee: currentYear,
@@ -106,40 +105,40 @@ export default function AdminDashboard({
                 search: value
             });
         }, 500);
-        
+
         setSearchTimeout(timeout);
     }, [currentYear, currentSpecialiteId, currentOptionId, currentSemester, searchTimeout, applyFilters]);
-    
+
     // Reset all filters
     const resetFilters = () => {
         setSearchTerm('');
         router.get('/admin/dashboard', {}, { preserveState: true });
         setOpenDropdown(null);
     };
-    
+
     // Get display labels
     const getYearLabel = () => {
-        if (!currentYear) return 'All';
-        return `Year ${currentYear}`;
+        if (!currentYear) return 'Tous';
+        return `Année ${currentYear}`;
     };
-    
+
     const getSpecialityLabel = () => {
-        if (!currentSpecialiteId) return 'All';
+        if (!currentSpecialiteId) return 'Tous';
         const spec = safeAvailableFilters.specialites?.find(s => s.id == currentSpecialiteId);
         if (!spec) return 'All';
         // Only libelle, no year
         const label = spec.libelle;
         return label.length > 25 ? label.substring(0, 22) + '...' : label;
     };
-    
+
     const getOptionLabel = () => {
-        if (!currentOptionId) return 'All';
+        if (!currentOptionId) return 'Tous';
         const opt = options.find(o => o.id == currentOptionId);
         if (!opt) return 'All';
         // Truncate if too long
         return opt.libelle.length > 25 ? opt.libelle.substring(0, 22) + '...' : opt.libelle;
     };
-    
+
     const getSemesterLabel = () => {
         const sem = semesters.find(s => s.value == currentSemester || s.value == String(currentSemester));
         if (!sem) return 'Cycle';
@@ -148,39 +147,13 @@ export default function AdminDashboard({
         return label.length > 30 ? label.substring(0, 27) + '...' : label;
     };
 
-    const KpiCard = ({ title, value, trend, type, icon: Icon }) => (
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-32 relative overflow-hidden group hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start z-10">
-                <h3 className="text-gray-500 font-bold text-xs uppercase tracking-wider">{title}</h3>
-                <div className={`p-2 rounded-lg ${type === 'up' || type === 'down_good' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                    <Icon className="w-5 h-5" />
-                </div>
-            </div>
-            <div className="z-10">
-                <div className="flex items-baseline gap-3">
-                    <h2 className="text-3xl font-black text-gray-900">{value}</h2>
-                    {trend && (
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                            (trend?.includes('+') && type !== 'down_good') || (trend?.includes('-') && type === 'down_good')
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                        }`}>
-                            {trend}
-                        </span>
-                    )}
-                </div>
-            </div>
-            <Icon className="absolute -bottom-4 -right-4 w-24 h-24 text-gray-50 opacity-10 transform -rotate-12 group-hover:scale-110 transition-transform" />
-        </div>
-    );
-
     const PodiumStep = ({ student, rank, color }) => {
         if (!student) return null;
         const prenom = student.prenom || '';
         const nom = student.nom || '';
         const moyenne = student.moyenne_cycle || student.moyenne_semestre || 0;
         const initials = (prenom[0] || '') + (nom[0] || '');
-        
+
         return (
             <div className={`flex flex-col items-center flex-1 ${rank === 1 ? '-mt-12 scale-110 z-10' : 'mt-0'}`}>
                 <div className="relative mb-4 group cursor-pointer" onClick={() => {
@@ -219,7 +192,7 @@ export default function AdminDashboard({
 
     const Dropdown = ({ label, value, isOpen, onToggle, children }) => (
         <div className="relative">
-            <button 
+            <button
                 onClick={onToggle}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-bold text-gray-700 transition-colors whitespace-nowrap min-w-[120px]"
             >
@@ -249,7 +222,7 @@ export default function AdminDashboard({
                         <h1 className="text-3xl font-black text-gray-900 tracking-tight">Student Rankings</h1>
                         <p className="text-gray-500 mt-1 text-sm">Overview of academic performance and rankings.</p>
                     </div>
-                    <button 
+                    <button
                         onClick={() => {
                             // Create export URL with current filters
                             const params = new URLSearchParams();
@@ -258,14 +231,14 @@ export default function AdminDashboard({
                             if (currentOptionId) params.set('option_id', currentOptionId);
                             if (currentSemester && currentSemester !== 'cycle') params.set('semester', currentSemester);
                             if (searchTerm) params.set('search', searchTerm);
-                            
+
                             // Direct download - export routes don't need Inertia
                             window.location.href = `/admin/dashboard/export?${params.toString()}`;
                         }}
                         className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5"
                     >
                         <Download className="w-5 h-5" />
-                        Export Report
+                        Exporter le Rapport
                     </button>
                 </div>
 
@@ -273,11 +246,11 @@ export default function AdminDashboard({
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8">
                     <div className="flex flex-wrap items-center gap-4 md:gap-6">
                         <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filters:</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filtres:</span>
 
                             {/* Year Dropdown */}
                             <Dropdown
-                                label="Year"
+                                label="Année"
                                 value={getYearLabel()}
                                 isOpen={openDropdown === 'year'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
@@ -287,7 +260,7 @@ export default function AdminDashboard({
                                         onClick={() => applyFilters({ annee: null, specialite_id: currentSpecialiteId, option_id: currentOptionId, semester: currentSemester, search: searchTerm })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Years
+                                        Toutes les années
                                     </button>
                                     {years.map(year => (
                                         <button
@@ -295,7 +268,7 @@ export default function AdminDashboard({
                                             onClick={() => applyFilters({ annee: year, specialite_id: currentSpecialiteId, option_id: currentOptionId, semester: currentSemester, search: searchTerm })}
                                             className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium ${currentYear == year ? 'bg-blue-50 text-blue-600' : ''}`}
                                         >
-                                            Year {year}
+                                            Année {year}
                                         </button>
                                     ))}
                                 </div>
@@ -303,7 +276,7 @@ export default function AdminDashboard({
 
                             {/* Speciality Dropdown */}
                             <Dropdown
-                                label="Speciality"
+                                label="Spécialité"
                                 value={getSpecialityLabel()}
                                 isOpen={openDropdown === 'speciality'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'speciality' ? null : 'speciality')}
@@ -313,7 +286,7 @@ export default function AdminDashboard({
                                         onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null, semester: currentSemester, search: searchTerm })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Specialities
+                                        Toutes les spécialités
                                     </button>
                                     {Object.keys(specialitesByLibelle).length > 0 ? (
                                         Object.values(specialitesByLibelle).map((group) => {
@@ -326,16 +299,16 @@ export default function AdminDashboard({
                                             if (!selectedSpec && group.specialites && group.specialites.length > 0) {
                                                 selectedSpec = group.specialites[0]; // Use first one as default
                                             }
-                                            
+
                                             // Check if any specialite in this group is selected
                                             const isSelected = selectedSpec && currentSpecialiteId == selectedSpec.id;
-                                            
+
                                             return (
                                                 <button
                                                     key={group.libelle}
                                                     onClick={() => {
                                                         // When clicking on a libelle, select the specialite matching current year, or first one
-                                                        const specToSelect = currentYear && group.specialites 
+                                                        const specToSelect = currentYear && group.specialites
                                                             ? group.specialites.find(s => s.annee == currentYear) || group.specialites[0]
                                                             : group.specialites[0];
                                                         if (specToSelect) {
@@ -349,7 +322,7 @@ export default function AdminDashboard({
                                             );
                                         })
                                     ) : (
-                                        <div className="px-4 py-2 text-sm text-gray-500">No specialities available</div>
+                                        <div className="px-4 py-2 text-sm text-gray-500">Aucune spécialité disponible</div>
                                     )}
                                 </div>
                             </Dropdown>
@@ -366,7 +339,7 @@ export default function AdminDashboard({
                                         onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: null, semester: currentSemester, search: searchTerm })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Options
+                                        Toutes les options
                                     </button>
                                     {filteredOptions.length > 0 ? (
                                         filteredOptions.map(opt => (
@@ -409,21 +382,13 @@ export default function AdminDashboard({
                             </Dropdown>
                         </div>
                         <div className="flex-1"></div>
-                        <button 
+                        <button
                             onClick={resetFilters}
                             className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
                         >
                             Reset Filters
                         </button>
                     </div>
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    <KpiCard title="Total Students" value={safeRankingStats.total_students?.value || '0'} trend={safeRankingStats.total_students?.trend || null} type={safeRankingStats.total_students?.trend_type || 'up'} icon={Users} />
-                    <KpiCard title="Class Average" value={safeRankingStats.class_average?.value || '0.00'} trend={safeRankingStats.class_average?.trend || null} type={safeRankingStats.class_average?.trend_type || 'up'} icon={BarChart3} />
-                    <KpiCard title="Pass Rate" value={safeRankingStats.pass_rate?.value || '0%'} trend={safeRankingStats.pass_rate?.trend || null} type={safeRankingStats.pass_rate?.trend_type || 'up'} icon={CheckCircle} />
-                    <KpiCard title="Total Absences" value={safeRankingStats.total_absences?.value || '0'} trend={safeRankingStats.total_absences?.trend || null} type={safeRankingStats.total_absences?.trend_type || 'down_good'} icon={AlertTriangle} />
                 </div>
 
                 {/* Podium Section */}
@@ -476,7 +441,7 @@ export default function AdminDashboard({
                                     const moyenne_cycle = student.moyenne_cycle || student.moyenne_semestre || 0;
                                     const initials = (prenom[0] || '') + (nom[0] || '');
                                     const rank = student.rank || 0;
-                                    
+
                                     return (
                                         <tr key={student.id || Math.random()} className="group hover:bg-blue-50/30 transition-colors">
                                             <td className="px-6 py-4 font-black text-gray-400 group-hover:text-blue-600">#{rank}</td>
@@ -498,7 +463,7 @@ export default function AdminDashboard({
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const params = new URLSearchParams();
                                                             if (currentSemester && currentSemester !== 'cycle') params.set('semester', currentSemester);
