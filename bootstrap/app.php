@@ -1,9 +1,9 @@
 <?php
-
+use App\Http\Middleware\HandleInertiaRequests; // Import important
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-
+use App\Http\Middleware\CurrentSemester;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->web(append: [
+            CurrentSemester::class,
+            HandleInertiaRequests::class, // <-- AJOUTE CETTE LIGNE
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -20,6 +20,9 @@ class AdminStatisticsController extends Controller
         // Build base query for students
         $studentQuery = Student::query();
 
+        if ($year) {
+            $studentQuery->whereHas('option.specialite', fn($q) => $q->where('annee', $year));
+        }
         if ($specialite) {
             $studentQuery->whereHas('option.specialite', fn($q) => $q->where('id', $specialite));
         }
@@ -35,8 +38,14 @@ class AdminStatisticsController extends Controller
             'unjustified' => Absence::whereIn('student_id', $studentIds)->where('justifie', false)->count(),
         ];
 
-        // 2. Average grades by module
-        $moduleStats = Module::select('id', 'libelle', 'semestre')
+        // 2. Average grades by module - Filter modules based on students' notes
+        // Get modules that have notes from the filtered students
+        $moduleIds = Note::whereIn('student_id', $studentIds)
+            ->distinct()
+            ->pluck('module_id');
+        
+        $moduleStats = Module::whereIn('id', $moduleIds)
+            ->select('id', 'libelle', 'semestre')
             ->get()
             ->map(function ($module) use ($studentIds) {
                 $avg = Note::where('module_id', $module->id)
@@ -46,7 +55,11 @@ class AdminStatisticsController extends Controller
                     'name' => $module->libelle,
                     'average' => round($avg ?? 0, 2),
                 ];
-            });
+            })
+            ->filter(function ($module) {
+                return $module['average'] > 0;
+            })
+            ->values();
 
         // 3. Student performances (Top 3)
         $topStudents = Student::whereIn('id', $studentIds)

@@ -28,10 +28,22 @@ ChartJS.register(
 export default function Statistics({ kpis, absence_stats, module_stats, top_students, filters: initialFilters, available_filters }) {
   const [filters, setFilters] = useState(initialFilters || {});
   const [openDropdown, setOpenDropdown] = useState(null);
+  
+  // Get filtered options based on selected specialite
+  const options = available_filters?.options || [];
+  const specialites = available_filters?.specialites || [];
+  const currentSpecialiteId = filters.specialite_id || null;
+  const filteredOptions = currentSpecialiteId
+    ? options.filter(opt => opt.specialite_id == currentSpecialiteId)
+    : options;
 
   // --- Gestion des Filtres (Identique) ---
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
+    // Reset option_id when specialite_id changes
+    if (key === 'specialite_id' && value) {
+      newFilters.option_id = '';
+    }
     setFilters(newFilters);
     const params = { ...newFilters };
     Object.keys(params).forEach(key => !params[key] && delete params[key]);
@@ -189,7 +201,21 @@ export default function Statistics({ kpis, absence_stats, module_stats, top_stud
                     ))}
                 </select>
 
-                {(filters.annee || filters.specialite_id) && (
+                <div className="w-px h-4 bg-slate-300"></div>
+
+                <select
+                    value={filters.option_id || ''}
+                    onChange={(e) => handleFilterChange('option_id', e.target.value)}
+                    className="border-none bg-transparent text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer hover:text-indigo-600 max-w-[150px] truncate"
+                    disabled={!currentSpecialiteId}
+                >
+                    <option value="">Option (Toutes)</option>
+                    {filteredOptions.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.libelle}</option>
+                    ))}
+                </select>
+
+                {(filters.annee || filters.specialite_id || filters.option_id) && (
                     <button onClick={clearFilters} className="ml-2 bg-rose-50 text-rose-600 p-1 rounded-full hover:bg-rose-100 transition">
                         <X className="w-3 h-3" />
                     </button>
