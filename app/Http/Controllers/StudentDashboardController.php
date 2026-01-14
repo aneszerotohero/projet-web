@@ -3,167 +3,235 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\Note;
+use App\Models\Absence;
+use App\Models\Coef;
 use Illuminate\Http\Request;
-
-// Use Inertia when available
-use function class_exists;
+use Inertia\Inertia;
 
 class StudentDashboardController extends Controller
 {
+    /**
+     * Calcule le classement en traversant les relations du schéma
+     */
+    private function calculateRanking($student, $scope, $semestre)
+    {
+        // 1. Définir la requête de base pour récupérer les "pairs" (camarades)
+        $query = Student::query();
+
+        // 2. Filtrer selon le scope demandé en suivant ton schéma BDD
+        switch ($scope) {
+            case 'option':
+                // Les étudiants de la même option
+                $query->where('option_id', $student->option_id);
+                break;
+
+            case 'specialite':
+                // Schema: students -> options -> specialite
+                // On cherche les étudiants dont l'option appartient à la même spécialité
+                $specialiteId = $student->option->specialite_id;
+                $query->whereHas('option', function ($q) use ($specialiteId) {
+                    $q->where('specialite_id', $specialiteId);
+                });
+                break;
+
+            case 'annee':
+                // Schema: students -> options -> specialite -> annee
+                // On cherche les étudiants dont l'option->specialite a la même année
+                $annee = $student->option->specialite->annee;
+                $query->whereHas('option.specialite', function ($q) use ($annee) {
+                    $q->where('annee', $annee);
+                });
+                break;
+        }
+
+        $peers = $query->get();
+
+        if ($peers->isEmpty()) {
+            return ['rank' => '-', 'total' => 0, 'top_score' => 0];
+        }
+
+        // 3. Calculer les moyennes de ce groupe
+        // Note: Idéalement, la moyenne par semestre devrait être stockée dans la table 'moyennes'
+        // pour éviter de recalculer à chaque fois, mais ici on recalcule pour être sûr.
+        $scores = $peers->map(function ($peer) use ($semestre) {
+            return [
+                'id' => $peer->id,
+                'moyenne' => $peer->moyenneParSemestre((int)$semestre)
+            ];
+        });
+
+        // 4. Trier et trouver le rang
+        $sorted = $scores->sortByDesc('moyenne')->values();
+
+        $rankIndex = $sorted->search(function ($item) use ($student) {
+            return $item['id'] == $student->id;
+        });
+
+        return [
+            'rank' => $rankIndex !== false ? $rankIndex + 1 : '-',
+            'total' => $sorted->count(),
+            'top_score' => $sorted->first()['moyenne'] ?? 0
+        ];
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
-        
-        // TEMP: Return mock data for frontend development if no user is logged in
-        if (! $user || ! $user->student) {
-            $mockPayload = [
-                'student' => [
-                    'id' => 1,
-                    'nom' => 'Benali',
-                    'prenom' => 'Amine',
-                    'matricule' => 'STU2024001',
-                    'date_naissance' => '2005-03-15',
-                    'adresse' => '123 Rue de la Paix, Alger',
-                ],
-                'semestre' => 2,
-                'annee' => '2023-2024',
-                'moyenne_semestre' => 14.50,
-                'moyenne_generale' => 13.80, // Cumulative
-                'progression_semestre' => 0.50,
-                'progression_generale' => 0.2,
-                'moyennes_par_module' => [
-                    [
-                        'id' => 1,
-                        'module' => 'Mathématiques',
-                        'code' => 'MATH',
-                        'coef' => 5,
-                        'ds' => 12.00,
-                        'td' => 14.50,
-                        'tp' => null,
-                        'exam' => 13.00,
-                        'moyenne' => 13.10
-                    ],
-                    [
-                        'id' => 2,
-                        'module' => 'Physique',
-                        'code' => 'PHYS',
-                        'coef' => 4,
-                        'ds' => 8.50,
-                        'td' => 12.00,
-                        'tp' => 13.50,
-                        'exam' => 8.00,
-                        'moyenne' => 9.80
-                    ],
-                    [
-                        'id' => 3,
-                        'module' => 'Littérature Arabe',
-                        'code' => 'ARAB',
-                        'coef' => 3,
-                        'ds' => 15.00,
-                        'td' => 16.00,
-                        'tp' => null,
-                        'exam' => 15.50,
-                        'moyenne' => 15.40
-                    ],
-                    [
-                        'id' => 4,
-                        'module' => 'Sciences Naturelles',
-                        'code' => 'SCI',
-                        'coef' => 5,
-                        'ds' => 10.00,
-                        'td' => 11.00,
-                        'tp' => 12.00,
-                        'exam' => 11.50,
-                        'moyenne' => 11.30
-                    ],
-                    [
-                        'id' => 5,
-                        'module' => 'Anglais',
-                        'code' => 'ENG',
-                        'coef' => 2,
-                        'ds' => 16.50,
-                        'td' => 17.00,
-                        'tp' => null,
-                        'exam' => 14.00,
-                        'moyenne' => 15.10
-                    ],
-                ],
-                'classement' => [
-                    'rank' => 5,
-                    'total' => 32,
-                ],
-                'absences_stats' => [
-                    'total' => 4,
-                    'unjustified' => 2,
-                    'justified' => 2,
-                ],
-                'chart_data' => [
-                    'labels' => ['MATH', 'PHYS', 'ARAB', 'SCI', 'ENG'],
-                    'student' => [13.10, 9.80, 15.40, 11.30, 15.10],
-                    'class_avg' => [11.50, 10.20, 12.50, 10.80, 13.00],
-                ],
-                'current_semestre' => 'S1',
-            ];
-            
-            if (class_exists(\Inertia\Inertia::class)) {
-                return \Inertia\Inertia::render('Eleve/Dashboard', $mockPayload);
-            }
-            return response()->json($mockPayload);
+
+        if (!$user || !$user->student_id) {
+            return redirect()->route('login');
         }
 
-        $sem = $request->get('semestre') ?? $request->attributes->get('current_semestre', 1);
+        // Récupérer le semestre (par défaut 1)
+        $sem = $request->get('semestre') ?? 1;
 
-        $student = $user->student()->with(['notes.module','notes.coef','moyennes'])->first();
+        // Charger l'étudiant avec le chemin complet vers l'année
+        // Student -> Option -> Specialite
+        $student = Student::with(['option.specialite', 'notes.module', 'notes.coef', 'absences'])
+            ->find($user->student_id);
 
+        if (!$student) {
+            return abort(404, 'Dossier étudiant introuvable.');
+        }
+
+        // --- 1. CALCULS DES NOTES & MOYENNES ---
+
+        // Calcul de la moyenne du semestre (Logique métier)
         $moyenneSem = $student->moyenneParSemestre((int) $sem);
-        $moyennesParModule = $student->moyennesParModule((int) $sem);
 
-        // Ensure it's a list for JSON serialization if it's a collection or assoc array
-        if ($moyennesParModule instanceof \Illuminate\Support\Collection) {
-            $moyennesParModule = $moyennesParModule->values();
-        } else if (is_array($moyennesParModule)) {
-            $moyennesParModule = array_values($moyennesParModule);
-        }
+        // Récupérer les notes du semestre actif
+        // On filtre les notes dont le module appartient au semestre demandé
+        $notes = $student->notes()
+            ->whereHas('module', function ($q) use ($sem) {
+                $q->where('semestre', $sem);
+            })
+            ->with(['module', 'coef'])
+            ->get();
 
-        $payload = [
-            'student' => $student,
-            'semestre' => (int) $sem,
-            'moyenne_semestre' => $moyenneSem,
-            'moyennes_par_module' => $moyennesParModule,
+        // Grouper par module
+        $moyennesParModule = $notes->groupBy('module_id')->map(function ($moduleNotes) {
+            $module = $moduleNotes->first()->module;
+            if (!$module) return null;
+
+            // Récupérer les types de notes via la table 'coef'
+            // Attention: Il faut que les libellés en base correspondent exactement ('DS', 'Exam', etc.)
+            $dsNote = $moduleNotes->first(fn($n) => $n->coef && $n->coef->libelle === 'DS')?->note;
+            $examNote = $moduleNotes->first(fn($n) => $n->coef && $n->coef->libelle === 'Exam')?->note;
+
+            // Calcul moyenne pondérée du module
+            $sum = 0.0;
+            $weights = 0.0;
+
+            foreach ($moduleNotes as $note) {
+                // Le poids de la note vient de la table 'coef' (ex: Exam = coef 2)
+                $w = $note->coef ? $note->coef->coef : 1;
+                $sum += ($note->note * $w);
+                $weights += $w;
+            }
+
+            $moyenneModule = $weights > 0 ? ($sum / $weights) : 0.0;
+
+            return [
+                'id' => $module->id,
+                'module' => $module->libelle,
+                'code' => substr($module->libelle, 0, 4),
+                'coef' => $module->coef ?? 1, // Coef du module (table modules)
+                'ds' => $dsNote,
+                'exam' => $examNote,
+                'moyenne' => round($moyenneModule, 2),
+            ];
+        })->filter()->values();
+
+        // --- 2. STATS & ABSENCES ---
+
+        // Calcul simple moyenne générale (tous semestres confondus)
+        // Pour être précis, il faudrait parcourir tous les semestres possibles
+        $moyenneGenerale = ($moyenneSem > 0) ? $moyenneSem : 0;
+
+        $absences = $student->absences;
+        $absencesStats = [
+            'total' => $absences->count(),
+            'justified' => $absences->where('justifie', 1)->count(),
+            'unjustified' => $absences->where('justifie', 0)->count(),
         ];
 
-        if (class_exists(\Inertia\Inertia::class)) {
-            return \Inertia\Inertia::render('Eleve/Dashboard', $payload);
+        // --- 3. GRAPHIQUE (MOI vs PROMO) ---
+
+        // Pour le graphe, on compare avec les gens de la même OPTION (ta classe directe)
+        $optionId = $student->option_id;
+        $classAverages = [];
+
+        foreach ($moyennesParModule as $mod) {
+            // Moyenne de ce module pour tous les élèves de l'option
+            $avg = Note::where('module_id', $mod['id'])
+                ->whereHas('student', fn($q) => $q->where('option_id', $optionId))
+                ->avg('note');
+
+            $classAverages[] = round($avg ?? 0, 2);
         }
 
-        return response()->json($payload);
+        $chartData = [
+            'labels' => $moyennesParModule->pluck('code')->toArray(),
+            'student' => $moyennesParModule->pluck('moyenne')->toArray(),
+            'class_avg' => $classAverages,
+        ];
+
+        // --- 4. CLASSEMENTS (CORRIGÉ SELON SCHEMA) ---
+
+        // Récupération sécurisée de l'année (Student -> Option -> Specialite -> annee)
+        $anneeScolaire = $student->option->specialite->annee ?? 'N/A';
+
+        $rankings = [
+            'option' => $this->calculateRanking($student, 'option', $sem),
+            'specialite' => $this->calculateRanking($student, 'specialite', $sem),
+            'annee' => $this->calculateRanking($student, 'annee', $sem),
+        ];
+
+        return Inertia::render('Student/Dashboard', [
+            'student' => $student,
+            'semestre' => (int) $sem,
+            'annee' => (string) $anneeScolaire,
+            'moyenne_semestre' => round($moyenneSem, 2),
+            'moyenne_generale' => round($moyenneGenerale, 2),
+            'progression_semestre' => 0,
+            'progression_generale' => 0,
+            'moyennes_par_module' => $moyennesParModule,
+            'absences_stats' => $absencesStats,
+            'chart_data' => $chartData,
+            'rankings' => $rankings,
+        ]);
     }
 
-    public function notes()
+    public function notes(Request $request)
     {
-        return \Inertia\Inertia::render('Eleve/Notes');
+        $user = $request->user();
+        $notes = Note::where('student_id', $user->student_id)
+            ->with(['module', 'coef'])
+            ->latest()
+            ->get();
+
+        return Inertia::render('Student/Notes', ['notes' => $notes]);
     }
 
-    public function absences()
+    public function absences(Request $request)
     {
-        return \Inertia\Inertia::render('Eleve/Absences');
+        $user = $request->user();
+        $absences = Absence::where('student_id', $user->student_id)
+            ->with('module')
+            ->orderBy('date_absence', 'desc')
+            ->get();
+
+        return Inertia::render('Student/Absences', ['absences' => $absences]);
     }
 
-    public function requestCorrection(Request $request)
+    public function requestCorrection()
     {
-        // Placeholder for correction logic
-        // $request->validate([...]);
-        // CorrectionRequest::create([...]);
-        
-        return response()->noContent();
+        return to_route('eleve.notes')->with('success', 'Demande envoyée');
     }
 
-    public function requestJustification(Request $request)
+    public function requestJustification()
     {
-        // Placeholder for justification logic
-        // $request->validate([...]);
-        // Justification::create([...]);
-
-        return response()->noContent();
+        return to_route('eleve.absences')->with('success', 'Justificatif envoyé');
     }
 }

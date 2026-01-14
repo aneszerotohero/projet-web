@@ -44,7 +44,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
             type: coef.libelle || 'N/A',
             grade: note.note || 0,
             coeff: coef.coef || 0,
-            date: createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: createdAt.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric', year: 'numeric' }),
             rawNote: note // Keep original for editing
         };
     });
@@ -232,18 +232,18 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
         // 1. Bloquer TOUT comportement par défaut
         e.preventDefault();
         e.stopPropagation();
-    
+
         setErrors({});
-    
+
         // DEBUG : On vérifie ce qui est calculé JUSTE avant l'appel
         const isEdit = editingNote && editingNote.id;
         const targetUrl = isEdit ? `/admin/notes/${editingNote.id}` : '/admin/notes/single';
-        
+
         console.log("--- LOG DE DÉBOGAGE ---");
         console.log("Mode:", isEdit ? "ÉDITION" : "CRÉATION");
         console.log("URL Cible:", targetUrl);
         console.log("Payload:", formData);
-    
+
         const options = {
             preserveScroll: true,
             onSuccess: () => {
@@ -261,7 +261,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                 if (errs?.message?.includes('419')) window.location.reload();
             }
         };
-    
+
         // 2. Exécution des appels
         if (isEdit) {
             // On utilise l'URL en dur calculée au-dessus
@@ -402,13 +402,13 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Notes Management</h1>
-                        <p className="text-gray-500 mt-1 text-sm">Manage student grades, coefficients, and academic records.</p>
+                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Gestion des Notes</h1>
+                        <p className="text-gray-500 mt-1 text-sm">Gérez les notes des étudiants, les coefficients et les dossiers académiques.</p>
                     </div>
                     <div className="flex gap-3">
                         <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-sm cursor-pointer">
                             <FileText className="w-4 h-4" />
-                            Import CSV
+                            Importer CSV
                             <input
                                 type="file"
                                 accept=".csv,.txt"
@@ -440,28 +440,28 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all text-sm"
                         >
                             <Plus className="w-4 h-4" />
-                            Add New Grade
+                            Ajouter une Note
                         </button>
                     </div>
                 </div>
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <KpiCard title="Average GPA" value={safeStats.average_gpa?.value || '0.0'} trend={safeStats.average_gpa?.trend || null} trendType={safeStats.average_gpa?.trend_type || 'up'} icon={TrendingUp} color="green" />
-                    <KpiCard title="Failing Students" value={safeStats.failing_students?.value || '0'} trend={safeStats.failing_students?.trend || null} trendType={safeStats.failing_students?.trend_type || 'down_good'} icon={AlertTriangle} color="red" />
-                    <KpiCard title="Grades Entered Today" value={safeStats.grades_today?.value || '0'} trend={safeStats.grades_today?.trend || null} trendType={safeStats.grades_today?.trend_type || 'up'} icon={Calendar} color="blue" />
+                    <KpiCard title="Moyenne générale" value={safeStats.average_gpa?.value || '0.0'} trend={safeStats.average_gpa?.trend || null} trendType={safeStats.average_gpa?.trend_type || 'up'} icon={TrendingUp} color="green" />
+                    <KpiCard title="Élèves en échec" value={safeStats.failing_students?.value || '0'} trend={safeStats.failing_students?.trend || null} trendType={safeStats.failing_students?.trend_type || 'down_good'} icon={AlertTriangle} color="red" />
+                    <KpiCard title="Notes saisies aujourd'hui" value={safeStats.grades_today?.value || '0'} trend={safeStats.grades_today?.trend || null} trendType={safeStats.grades_today?.trend_type || 'up'} icon={Calendar} color="blue" />
                 </div>
 
                 {/* Filters */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
                     <div className="flex flex-wrap items-center gap-4">
                         <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filters:</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Filtres :</span>
 
                             {/* Year Dropdown */}
                             <Dropdown
-                                label="Year"
-                                value={currentYear ? `Year ${currentYear}` : 'All'}
+                                label="Année"
+                                value={currentYear ? `Année ${currentYear}` : 'Toutes'}
                                 isOpen={openDropdown === 'year'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
                             >
@@ -470,7 +470,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         onClick={() => applyFilters({ annee: null, specialite_id: currentSpecialiteId, option_id: currentOptionId })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Years
+                                        Toutes les années
                                     </button>
                                     {years.map(year => (
                                         <button
@@ -486,8 +486,8 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
 
                             {/* Speciality Dropdown */}
                             <Dropdown
-                                label="Speciality"
-                                value={currentSpecialiteId ? (specialites.find(s => s.id == currentSpecialiteId)?.libelle || 'All') : 'All'}
+                                label="Spécialité"
+                                value={currentSpecialiteId ? (specialites.find(s => s.id == currentSpecialiteId)?.libelle || 'Toutes') : 'Toutes'}
                                 isOpen={openDropdown === 'speciality'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'speciality' ? null : 'speciality')}
                             >
@@ -496,7 +496,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         onClick={() => applyFilters({ annee: currentYear, specialite_id: null, option_id: null })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Specialities
+                                        Toutes les spécialités
                                     </button>
                                     {Object.keys(specialitesByLibelle).length > 0 ? (
                                         Object.values(specialitesByLibelle).map((group) => {
@@ -535,7 +535,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             {/* Option Dropdown */}
                             <Dropdown
                                 label="Option"
-                                value={currentOptionId ? (filteredOptions.find(o => o.id == currentOptionId)?.libelle || 'All') : 'All'}
+                                value={currentOptionId ? (filteredOptions.find(o => o.id == currentOptionId)?.libelle || 'Toutes') : 'Toutes'}
                                 isOpen={openDropdown === 'option'}
                                 onToggle={() => setOpenDropdown(openDropdown === 'option' ? null : 'option')}
                             >
@@ -544,7 +544,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         onClick={() => applyFilters({ annee: currentYear, specialite_id: currentSpecialiteId, option_id: null })}
                                         className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg text-sm font-medium"
                                     >
-                                        All Options
+                                        Toutes les options
                                     </button>
                                     {filteredOptions.length > 0 ? (
                                         filteredOptions.map(opt => (
@@ -687,14 +687,14 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                                         <button
                                                             onClick={() => openEditModal(note)}
                                                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="Edit"
+                                                            title="Modifier"
                                                         >
                                                             <Pencil className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDelete(note.id)}
                                                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Delete"
+                                                            title="Supprimer"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -711,7 +711,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                     {safeRes.last_page > 1 && (
                         <div className="p-4 border-t border-gray-50 flex justify-between items-center text-sm">
                             <span className="text-gray-500 font-medium">
-                                Showing <span className="font-bold text-gray-900">{safeRes.from || 0}</span> to <span className="font-bold text-gray-900">{safeRes.to || 0}</span> of <span className="font-bold text-gray-900">{safeRes.total || 0}</span> results
+                                Affiche <span className="font-bold text-gray-900">{safeRes.from || 0}</span> à <span className="font-bold text-gray-900">{safeRes.to || 0}</span> sur <span className="font-bold text-gray-900">{safeRes.total || 0}</span> résultats
                             </span>
                             <div className="flex items-center gap-2">
                                 {safeRes.current_page > 1 ? (
@@ -730,10 +730,10 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         }}
                                         className="px-4 py-2 border border-gray-200 rounded-lg text-gray-600 font-bold hover:bg-gray-50 transition-colors"
                                     >
-                                        Previous
+                                        Précédent
                                     </button>
                                 ) : (
-                                    <span className="px-4 py-2 text-gray-400 font-medium">Previous</span>
+                                    <span className="px-4 py-2 text-gray-400 font-medium">Précédent</span>
                                 )}
                                 {Array.from({ length: Math.min(5, safeRes.last_page) }, (_, i) => {
                                     let pageNum;
@@ -786,10 +786,10 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         }}
                                         className="px-4 py-2 text-gray-600 font-bold hover:text-blue-600"
                                     >
-                                        Next
+                                        Suivant
                                     </button>
                                 ) : (
-                                    <span className="px-4 py-2 text-gray-400 font-medium">Next</span>
+                                    <span className="px-4 py-2 text-gray-400 font-medium">Suivant</span>
                                 )}
                             </div>
                         </div>
@@ -803,7 +803,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                             <h2 className="text-2xl font-black text-gray-900">
-                                {editingNote ? 'Edit Note' : 'Add New Grade'}
+                                {editingNote ? 'Modifier la note' : 'Ajouter une note'}
                             </h2>
                             <button
                                 onClick={() => {
@@ -821,7 +821,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             {/* Student Search */}
                             <div className="relative">
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Student *
+                                    Élève *
                                 </label>
                                 <div className="relative">
                                     <input
@@ -829,7 +829,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         value={studentSearch}
                                         onChange={(e) => handleStudentSearch(e.target.value)}
                                         onFocus={() => studentSearch.length >= 2 && setShowStudentResults(true)}
-                                        placeholder="Search by name or matricule..."
+                                        placeholder="Chercher par nom ou matricule..."
                                         className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all ${errors.student_id ? 'border-red-500' : 'border-gray-200'
                                             }`}
                                         required={!editingNote}
@@ -856,7 +856,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                     )}
                                     {showStudentResults && studentSearch.length >= 2 && studentSearchResults.length === 0 && (
                                         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 text-sm text-gray-500">
-                                            No students found
+                                            Aucun élève trouvé
                                         </div>
                                     )}
                                 </div>
@@ -879,7 +879,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                     disabled={!formData.student_id}
                                 >
                                     <option value="">
-                                        {!formData.student_id ? 'Select a student first' : 'Select Module'}
+                                        {!formData.student_id ? 'Sélectionnez d\'abord un élève' : 'Sélectionner le module'}
                                     </option>
                                     {availableModules.map((module) => (
                                         <option key={module.id} value={module.id}>
@@ -895,7 +895,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             {/* Coef/Type Select */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Grade Type *
+                                    Type d'évaluation *
                                 </label>
                                 <select
                                     value={formData.coef_id}
@@ -904,7 +904,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                         }`}
                                     required
                                 >
-                                    <option value="">Select Type</option>
+                                    <option value="">Sélectionner le type</option>
                                     {coefs.map((coef) => (
                                         <option key={coef.id} value={coef.id}>
                                             {coef.libelle} (Coef: {coef.coef})
@@ -919,7 +919,7 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                             {/* Grade Input */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Grade (0-20) *
+                                    Note (0-20) *
                                 </label>
                                 <input
                                     type="number"
@@ -948,13 +948,13 @@ export default function NotesAdmin({ meta = {}, res = {}, stats = {}, filters: i
                                     }}
                                     className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
                                 >
-                                    Cancel
+                                    Annuler
                                 </button>
                                 <button
                                     type="submit"
                                     className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all"
                                 >
-                                    {editingNote ? 'Update' : 'Create'}
+                                    {editingNote ? 'Mettre à jour' : 'Enregistrer'}
                                 </button>
                             </div>
                         </form>

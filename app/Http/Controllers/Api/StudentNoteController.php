@@ -64,7 +64,7 @@ class StudentNoteController extends Controller
         // Return modules that the student has notes in, or all modules for their specialite
         // Option 1: All modules for their specialite (better for filters)
         $student = $user->student->load('option.specialite.modules');
-        
+
         $modules = [];
         if ($student->option && $student->option->specialite) {
              $modules = $student->option->specialite->modules()->select('id', 'libelle', 'semestre')->get();

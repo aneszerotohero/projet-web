@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutDashboard, Users, FileBarChart, Bell, Search, LogOut, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileBarChart, Bell, BarChart3, LogOut, Menu, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
-    const { url } = usePage();
+    const { url, props } = usePage();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { props } = usePage();
+
+    // Récupération des données partagées (auth et flash)
     const user = props.auth?.user || { nom: 'Administrateur', prenom: 'Principal' };
+    const flash = props.flash || {};
 
     const isActive = (path) => url.startsWith(path);
 
@@ -49,41 +51,34 @@ export default function AdminLayout({ children }) {
                         </div>
                     </div>
 
-                    {/* Nav Links - Scrollable Area */}
+                    {/* Nav Links - REMISE DES ROUTES D'ORIGINE */}
                     <div className="flex-1 overflow-y-auto py-5">
                         <div className="px-4 space-y-1">
-                            <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Tableau de bord" />
-
                             <div className="pt-4 pb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                 Gestion Scolaire
                             </div>
+                            <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Tableau de bord" />
                             <NavItem href="/admin/notes/manage" icon={FileBarChart} label="Gestion des Notes" />
                             <NavItem href="/admin/absences/manage" icon={Bell} label="Gestion des Absences" />
-
-                            <div className="pt-4 pb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                Système
-                            </div>
-                            <NavItem href="/admin/users" icon={Users} label="Utilisateurs" />
-                            <NavItem href="/admin/settings" icon={Settings} label="Paramètres" />
+                            <NavItem href="/admin/statistiques" icon={BarChart3} label="Statistiques" />
                         </div>
                     </div>
 
-                    {/* User Info Bottom - Fixed at bottom of sidebar */}
+                    {/* User Info Bottom */}
                     <div className="border-t border-gray-200 p-4 shrink-0 bg-white">
                         <div className="flex items-center">
-    <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-        {user.prenom?.[0] || 'A'}
-    </div>
-    <div className="ml-3">
-        <p className="text-sm font-medium text-gray-700">
-            {user.prenom || 'Administrateur'} {user.nom || 'Principal'}
-        </p>
-        <Link href="/logout" method="post" className="text-xs text-red-600 hover:text-red-800 flex items-center mt-1">
-            <LogOut className="w-3 h-3 mr-1" /> Déconnexion
-        </Link>
-    </div>
-</div>
-
+                            <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                {user.prenom?.[0] || 'A'}
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm font-medium text-gray-700">
+                                    {user.prenom || 'Admin'} {user.nom || ''}
+                                </p>
+                                <Link href="/logout" method="post" as="button" className="text-xs text-red-600 hover:text-red-800 flex items-center mt-1 outline-none">
+                                    <LogOut className="w-3 h-3 mr-1" /> Déconnexion
+                                </Link>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -96,11 +91,28 @@ export default function AdminLayout({ children }) {
                         <Menu className="w-6 h-6" />
                     </button>
                     <span className="font-bold text-gray-900">AdminPanel</span>
-                    <div className="w-6"></div> {/* Spacer */}
+                    <div className="w-6"></div>
                 </div>
 
-                {/* Content */}
+                {/* Content Area */}
                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+
+                    {/* --- AFFICHAGE DES MESSAGES FLASH --- */}
+                    <div className="w-full mb-6">
+                        {flash?.success && (
+                            <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl shadow-sm mb-4">
+                                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                <span className="font-bold text-sm">{flash.success}</span>
+                            </div>
+                        )}
+                        {flash?.error && (
+                            <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl shadow-sm mb-4">
+                                <AlertCircle className="w-5 h-5 text-rose-500" />
+                                <span className="font-bold text-sm">{flash.error}</span>
+                            </div>
+                        )}
+                    </div>
+
                     {children}
                 </main>
             </div>

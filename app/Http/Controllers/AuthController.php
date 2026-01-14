@@ -47,11 +47,7 @@ class AuthController extends Controller
             return redirect()->intended($redirect);
         }
 
-        // For Inertia (AJAX) requests return JSON validation-style error and 422 status
-        if ($request->header('X-Inertia') || $request->wantsJson()) {
-            return response()->json(['errors' => ['matricule' => 'Identifiants invalides']], 422);
-        }
-
+        // Always use back()->withErrors() for Inertia requests - never response()->json()
         return back()->withErrors(['matricule' => 'Identifiants invalides'])->withInput();
     }
 
